@@ -4,16 +4,15 @@ from typing import Any
 
 import structlog
 
-from app.core.config import get_settings
+from app.core.config import Settings
 
 
-def setup_logging() -> None:
+def setup_logging(settings: Settings) -> None:
     """Configure structured logging using structlog.
 
-    Reads configuration settings to format output as readable console text
-    for local development, or structured JSON for other environments.
+    Accepts an application Settings instance to format output as readable
+    console text for local development, or structured JSON for production.
     """
-    settings = get_settings()
     log_level = settings.log_level.upper()
 
     # Map the string log level to standard logging levels

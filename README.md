@@ -52,3 +52,38 @@ fastapi-ai/
 4. **Access the API**:
    - API Endpoint: http://localhost:8000/
    - API Docs (Swagger UI): http://localhost:8000/docs
+
+## Configuration
+
+The application is configured using environment variables prefixed with `AI_`. See `.env.example` for details.
+
+### Key Environment Variables
+*   `AI_PROVIDER`: The selected AI provider. Currently supports `ollama`.
+*   `AI_OLLAMA_BASE_URL`: Base connection URL of the running Ollama API service (e.g. `http://localhost:11434`).
+*   `AI_EMBEDDING_MODEL`: Configured model used for generating embeddings.
+*   `AI_LLM_MODEL`: Configured LLM model used for chat completions.
+
+### Startup Validation
+On application boot, the engine automatically resolves the configured AI provider and runs a startup validation check calling its health check API. If the provider is unreachable, a warning is printed to the structured logs, but the application continues to start up.
+
+### Health Endpoint
+A detailed health check is available at:
+*   `GET /api/v1/health`
+
+This endpoint returns HTTP 200 health status including nested dependency states even if third-party providers (like Ollama) are offline:
+```json
+{
+  "status": "UP",
+  "service": "fastapi-ai",
+  "version": "1.0.0",
+  "environment": "development",
+  "dependencies": {
+    "provider": {
+      "healthy": true,
+      "provider": "ollama",
+      "message": "Ollama service is reachable and healthy."
+    }
+  }
+}
+```
+

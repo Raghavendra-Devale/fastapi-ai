@@ -1,6 +1,8 @@
 from fastapi import APIRouter
 
+from app.api.v1.endpoints import health
+
 api_router = APIRouter()
 
-# Include endpoints here as they are developed
-# e.g., api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
+# Register health check endpoints
+api_router.include_router(health.router, tags=["health"])

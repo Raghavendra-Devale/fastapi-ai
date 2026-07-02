@@ -8,16 +8,11 @@ import structlog
 logger = structlog.get_logger("request_logger")
 
 
-class CorrelationAndLoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware for assigning Correlation IDs and logging HTTP requests.
-
-    Ensures every request has a tracking correlation ID injected into log
-    contextvars, logs request metadata on completion, and adds the
-    correlation ID to response headers.
-    """
+class CorrelationIdMiddleware(BaseHTTPMiddleware):
+    """Middleware for assigning a tracking Correlation ID to each request."""
 
     async def dispatch(self, request: Request, call_next):
-        # Retrieve or generate Correlation ID
+        # Retrieve incoming correlation ID or generate a new UUID
         correlation_id = request.headers.get("X-Correlation-ID") or str(
             uuid.uuid4()
         )
@@ -27,6 +22,17 @@ class CorrelationAndLoggingMiddleware(BaseHTTPMiddleware):
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(correlation_id=correlation_id)
 
+        response = await call_next(request)
+
+        # Set the correlation ID header in the response
+        response.headers["X-Correlation-ID"] = correlation_id
+        return response
+
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    """Middleware for profiling and logging incoming HTTP request execution."""
+
+    async def dispatch(self, request: Request, call_next):
         start_time = time.perf_counter()
 
         try:
@@ -37,11 +43,11 @@ class CorrelationAndLoggingMiddleware(BaseHTTPMiddleware):
             raise exc
         finally:
             duration_ms = (time.perf_counter() - start_time) * 1000.0
+            correlation_id = getattr(request.state, "correlation_id", "unknown")
 
-            # Log request execution metadata.
-            # Using request.url.path avoids logging query strings that may contain secrets.
+            # Log request execution metadata using structured event naming
             logger.info(
-                "HTTP Request",
+                event="request_completed",
                 correlation_id=correlation_id,
                 method=request.method,
                 path=request.url.path,
@@ -49,6 +55,4 @@ class CorrelationAndLoggingMiddleware(BaseHTTPMiddleware):
                 duration_ms=round(duration_ms, 2),
             )
 
-        # Set the correlation ID header in the response
-        response.headers["X-Correlation-ID"] = correlation_id
         return response

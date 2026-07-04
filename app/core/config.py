@@ -46,6 +46,8 @@ class Settings(BaseSettings):
 
     # Ollama settings
     ollama_base_url: str
+    ollama_model: str = "llama3"
+    ollama_timeout: float = 30.0
 
     # Embedding settings
     embedding_model: str

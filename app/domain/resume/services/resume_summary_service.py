@@ -4,22 +4,25 @@ from fastapi import Depends
 from app.core.config import Settings, get_settings
 from app.core.exceptions import ExternalServiceException, ValidationException
 from app.core.logging import get_logger
-from app.providers.base import AIProvider
-from app.providers.factory import get_ai_provider
+from app.domain.ai.providers.interfaces.llm_provider import LLMProvider
+from app.domain.ai.providers.dependencies import get_llm_provider
 
 logger = get_logger(__name__)
 
 
 class ResumeSummaryService:
-    """Domain service to generate a concise professional summary from resume text."""
+    """Domain service to generate a concise professional summary from resume text.
+
+    Uses a decoupled LLMProvider interface to execute the prompt, avoiding direct dependency on any model SDK.
+    """
 
     def __init__(
         self,
-        ai_provider: AIProvider = Depends(get_ai_provider),
+        llm_provider: LLMProvider = Depends(get_llm_provider),
         settings: Settings = Depends(get_settings),
     ):
-        """Initialize the resume summary service with AI provider and settings."""
-        self._ai_provider = ai_provider
+        """Initialize the resume summary service with LLM provider and settings."""
+        self._llm_provider = llm_provider
         self._settings = settings
 
     async def generate_summary(self, normalized_text: str) -> str:
@@ -48,13 +51,16 @@ class ResumeSummaryService:
 
         start_time = time.perf_counter()
         success = False
-        model = self._settings.llm_model
+        model = self._settings.ollama_model
 
         try:
-            chat_response = await self._ai_provider.chat(prompt)
-            model = chat_response.model
+            summary = await self._llm_provider.generate(
+                prompt=prompt,
+                system_prompt="You are a professional resume parser and writer.",
+                temperature=0.2,
+            )
             success = True
-            return chat_response.content.strip()
+            return summary.strip()
         except ExternalServiceException:
             # Re-raise since it's already an ExternalServiceException
             raise

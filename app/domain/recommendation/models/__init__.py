@@ -1,1 +1,2 @@
 from app.domain.recommendation.models.recommendation_request import JobDocument, RecommendationRequest
+from app.domain.recommendation.models.recommendation_response import RecommendationItem, RecommendationResponse

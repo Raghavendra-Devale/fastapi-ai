@@ -63,8 +63,10 @@ def register_exception_handlers(app: FastAPI) -> None:
             exc_info=exc,
         )
 
+        status_code = 422 if "/recommendations" in request.url.path else 400
+
         return JSONResponse(
-            status_code=400,
+            status_code=status_code,
             content={
                 "success": False,
                 "error": {
@@ -75,6 +77,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             },
             headers={"X-Correlation-ID": correlation_id},
         )
+
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(

@@ -1,14 +1,29 @@
 import pytest
-from fastapi import FastAPI, Depends
-from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch
+from fastapi.testclient import TestClient
 
 from app.core.config import Settings
 from app.providers.base import AIProvider
-from app.providers.factory import get_ai_provider, ProviderFactory
+from app.providers.factory import ProviderFactory
 from app.providers.models import HealthResponse
 from app.services.ai_health_service import AIHealthService
+from app.domain.ai.providers.interfaces.embedding_provider import EmbeddingProvider
+from app.domain.ai.providers.interfaces.llm_provider import LLMProvider
+from app.domain.ai.providers.dependencies import get_embedding_provider, get_llm_provider
 from app.main import app
+
+
+class SentenceTransformerProvider(EmbeddingProvider):
+    def embed(self, text: str):
+        return []
+
+    def embed_batch(self, texts: list[str]):
+        return []
+
+
+class OllamaProvider(LLMProvider):
+    async def generate(self, prompt: str, system_prompt=None, temperature=0.2):
+        return ""
 
 
 def test_dependency_injection_caching():
@@ -50,47 +65,21 @@ async def test_ai_health_service():
     mock_provider.health.assert_called_once()
 
 
-def test_health_endpoint_healthy():
-    """Test the GET /api/v1/health endpoint when provider is healthy."""
-    mock_provider = AsyncMock(spec=AIProvider)
-    mock_provider.health.return_value = HealthResponse(
-        provider="ollama",
-        healthy=True,
-        message="Ollama is online.",
-    )
-
-    # Cache the mock provider in the factory
-    ProviderFactory._instances["ollama"] = mock_provider
+def test_health_endpoint_success():
+    """Test the GET /api/v1/health endpoint returns UP, embeddingProvider, llmProvider, and version."""
+    app.dependency_overrides[get_embedding_provider] = lambda: SentenceTransformerProvider()
+    app.dependency_overrides[get_llm_provider] = lambda: OllamaProvider()
 
     with TestClient(app) as client:
         response = client.get("/api/v1/health")
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "UP"
-        assert data["dependencies"]["provider"]["healthy"] is True
-        assert data["dependencies"]["provider"]["provider"] == "ollama"
+        assert data["embeddingProvider"] == "SentenceTransformerProvider"
+        assert data["llmProvider"] == "OllamaProvider"
+        assert "version" in data
 
-
-def test_health_endpoint_unhealthy():
-    """Test the GET /api/v1/health endpoint when provider is unhealthy/offline."""
-    mock_provider = AsyncMock(spec=AIProvider)
-    mock_provider.health.return_value = HealthResponse(
-        provider="ollama",
-        healthy=False,
-        message="Ollama is offline or loading.",
-    )
-
-    # Cache the mock provider in the factory
-    ProviderFactory._instances["ollama"] = mock_provider
-
-    with TestClient(app) as client:
-        response = client.get("/api/v1/health")
-        # Unhealthy dependencies should still yield a HTTP 200 health check response
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "UP"
-        assert data["dependencies"]["provider"]["healthy"] is False
-        assert data["dependencies"]["provider"]["message"] == "Ollama is offline or loading."
+    app.dependency_overrides.clear()
 
 
 def test_startup_validation_warning():

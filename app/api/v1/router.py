@@ -1,12 +1,14 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import health, resume
+from app.api.v1.endpoints import resume
 from app.api.recommendations import recommendation_controller
+from app.api.health import health_controller
 
 api_router = APIRouter()
 
 # Register health check endpoints
-api_router.include_router(health.router, tags=["health"])
+api_router.include_router(health_controller.router, prefix="/health", tags=["health"])
+
 
 # Register resume endpoints
 api_router.include_router(resume.router, prefix="/resume", tags=["resume"])

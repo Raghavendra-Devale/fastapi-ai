@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     # LLM settings
     llm_model: str
 
+    # File upload settings
+    max_resume_size_bytes: int = 10 * 1024 * 1024  # Default to 10MB
+
     # Logging settings
     log_level: str = "INFO"
 

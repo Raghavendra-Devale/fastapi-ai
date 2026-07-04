@@ -1,0 +1,1 @@
+from app.domain.recommendation.services.embedding_service import EmbeddingService

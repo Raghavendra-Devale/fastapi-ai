@@ -1,0 +1,1 @@
+from app.domain.recommendation.models.recommendation_request import JobDocument, RecommendationRequest

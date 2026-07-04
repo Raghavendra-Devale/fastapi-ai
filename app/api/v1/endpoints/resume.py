@@ -91,5 +91,12 @@ async def process_resume(
             extracted_text=domain_response.resume_text,
             embedding_model=domain_response.embedding_model,
             embedding_dimensions=domain_response.embedding_dimensions,
+            summary=domain_response.summary,
+            skills=domain_response.intelligence.skills if domain_response.intelligence else [],
+            education=domain_response.intelligence.education if domain_response.intelligence else [],
+            experience=domain_response.intelligence.experience if domain_response.intelligence else [],
+            certifications=domain_response.intelligence.certifications if domain_response.intelligence else [],
+            projects=domain_response.intelligence.projects if domain_response.intelligence else [],
+            languages=domain_response.intelligence.languages if domain_response.intelligence else [],
         ),
     )

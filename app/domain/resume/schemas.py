@@ -1,4 +1,13 @@
 from pydantic import BaseModel, Field
+from app.domain.resume.models import (
+    ResumeIntelligence,
+    Skill,
+    Education,
+    Experience,
+    Project,
+    Certification,
+    Language,
+)
 
 
 class ResumeProcessResponse(BaseModel):
@@ -18,6 +27,12 @@ class ResumeProcessResponse(BaseModel):
     )
     processing_time_ms: float = Field(
         ..., description="The total pipeline processing time in milliseconds."
+    )
+    summary: str | None = Field(
+        None, description="A short, generated professional summary of the candidate."
+    )
+    intelligence: ResumeIntelligence | None = Field(
+        None, description="The enriched ResumeIntelligence object."
     )
 
     model_config = {
@@ -44,6 +59,33 @@ class ResumeDetails(BaseModel):
     )
     embedding_dimensions: int = Field(
         ..., description="The length (dimensions) of the generated embedding."
+    )
+    summary: str | None = Field(
+        None, description="A short, generated professional summary of the candidate."
+    )
+    skills: list[Skill] = Field(
+        default_factory=list,
+        description="The list of skills extracted from the resume.",
+    )
+    education: list[Education] = Field(
+        default_factory=list,
+        description="The list of educational credentials extracted.",
+    )
+    experience: list[Experience] = Field(
+        default_factory=list,
+        description="The list of work history entries extracted.",
+    )
+    projects: list[Project] = Field(
+        default_factory=list,
+        description="The list of projects extracted.",
+    )
+    certifications: list[Certification] = Field(
+        default_factory=list,
+        description="The list of certifications extracted.",
+    )
+    languages: list[Language] = Field(
+        default_factory=list,
+        description="The list of languages spoken by the candidate.",
     )
 
 

@@ -9,6 +9,7 @@ from app.domain.resume.schemas import ResumeProcessResponse
 
 @pytest.fixture
 def mock_app_service():
+    from app.domain.resume.models import ResumeIntelligence, EmbeddingMetadata
     mock_service = AsyncMock(spec=ResumeApplicationService)
     # Store standard response
     mock_service.process_resume.return_value = ResumeProcessResponse(
@@ -17,6 +18,12 @@ def mock_app_service():
         embedding_dimensions=3,
         embedding_model="test-model",
         processing_time_ms=12.34,
+        summary="A professional summary.",
+        intelligence=ResumeIntelligence(
+            extracted_text="Extracted Resume Text",
+            summary="A professional summary.",
+            embedding=EmbeddingMetadata(model="test-model", dimensions=3),
+        ),
     )
     return mock_service
 
@@ -37,6 +44,8 @@ def test_process_resume_success(mock_app_service):
         assert data["resume"]["extracted_text"] == "Extracted Resume Text"
         assert data["resume"]["embedding_model"] == "test-model"
         assert data["resume"]["embedding_dimensions"] == 3
+        assert data["resume"]["summary"] == "A professional summary."
+        assert data["resume"]["skills"] == []
         # Ensure raw embeddings are NOT leaked
         assert "embedding" not in data["resume"]
         assert "embedding" not in data

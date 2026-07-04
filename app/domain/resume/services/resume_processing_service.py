@@ -7,6 +7,8 @@ from app.application.ai.embedding_service import EmbeddingService
 from app.domain.resume.services.pdf_extraction_service import PDFExtractionService
 from app.domain.resume.services.text_normalization_service import TextNormalizationService
 from app.domain.resume.schemas import ResumeProcessResponse
+from app.domain.resume.services.resume_summary_service import ResumeSummaryService
+from app.domain.resume.models import ResumeIntelligence, EmbeddingMetadata
 
 logger = get_logger(__name__)
 
@@ -19,11 +21,13 @@ class ResumeProcessingService:
         embedding_service: EmbeddingService = Depends(EmbeddingService),
         pdf_extractor: PDFExtractionService = Depends(PDFExtractionService),
         text_normalizer: TextNormalizationService = Depends(TextNormalizationService),
+        summary_service: ResumeSummaryService = Depends(ResumeSummaryService),
     ):
         """Initialize the processing service with its dependent services."""
         self._embedding_service = embedding_service
         self._pdf_extractor = pdf_extractor
         self._text_normalizer = text_normalizer
+        self._summary_service = summary_service
 
     async def process_resume(self, pdf_bytes: bytes) -> ResumeProcessResponse:
         """Execute the full resume processing pipeline.
@@ -77,6 +81,34 @@ class ResumeProcessingService:
             duration_ms=round(embed_duration_ms, 2),
         )
 
+        # 4. Generate Summary via ResumeSummaryService
+        summary_start = time.perf_counter()
+        try:
+            summary = await self._summary_service.generate_summary(normalized_text)
+        except AppException:
+            raise
+        except Exception as e:
+            raise ExternalServiceException(
+                message=f"Failed to generate summary: {str(e)}",
+                error_code="SUMMARY_GENERATION_FAILED",
+            )
+        summary_duration_ms = (time.perf_counter() - summary_start) * 1000.0
+
+        logger.info(
+            event="summary_generation_completed",
+            duration_ms=round(summary_duration_ms, 2),
+        )
+
+        # 5. Enrich ResumeIntelligence
+        intelligence = ResumeIntelligence(
+            extracted_text=normalized_text,
+            summary=summary,
+            embedding=EmbeddingMetadata(
+                model=embedding_response.model,
+                dimensions=embedding_response.dimensions,
+            ),
+        )
+
         total_duration_ms = (time.perf_counter() - total_start) * 1000.0
         logger.info(
             event="resume_processing_completed",
@@ -89,4 +121,6 @@ class ResumeProcessingService:
             embedding_dimensions=embedding_response.dimensions,
             embedding_model=embedding_response.model,
             processing_time_ms=round(total_duration_ms, 2),
+            summary=summary,
+            intelligence=intelligence,
         )

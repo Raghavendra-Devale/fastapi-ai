@@ -8,6 +8,7 @@ from app.providers.models import EmbeddingResponse
 from app.application.ai.embedding_service import EmbeddingService
 from app.domain.resume.services.pdf_extraction_service import PDFExtractionService
 from app.domain.resume.services.text_normalization_service import TextNormalizationService
+from app.domain.resume.services.resume_summary_service import ResumeSummaryService
 from app.domain.resume.services.resume_processing_service import ResumeProcessingService
 
 
@@ -96,23 +97,38 @@ async def test_resume_processing_pipeline_success():
         dimensions=3,
     )
 
-    service = ResumeProcessingService(embedding_service=mock_embedding_service)
+    mock_summary_service = AsyncMock(spec=ResumeSummaryService)
+    mock_summary_service.generate_summary.return_value = "Candidate summary"
+
+    service = ResumeProcessingService(
+        embedding_service=mock_embedding_service,
+        summary_service=mock_summary_service,
+    )
     response = await service.process_resume(pdf_bytes)
 
     assert response.resume_text == "John Doe\nSoftware Engineer"
     assert response.embedding == [0.1, 0.2, 0.3]
     assert response.embedding_dimensions == 3
     assert response.embedding_model == "test-embed-model"
+    assert response.summary == "Candidate summary"
+    assert response.intelligence is not None
+    assert response.intelligence.summary == "Candidate summary"
+    assert response.intelligence.extracted_text == "John Doe\nSoftware Engineer"
+    assert response.intelligence.embedding.model == "test-embed-model"
     assert response.processing_time_ms > 0
 
     mock_embedding_service.generate_embedding.assert_called_once_with("John Doe\nSoftware Engineer")
+    mock_summary_service.generate_summary.assert_called_once_with("John Doe\nSoftware Engineer")
 
 
 @pytest.mark.asyncio
 async def test_resume_processing_invalid_pdf_propagates():
     """Test that PDF extraction validation failures propagate through orchestrator."""
-    mock_embedding_service = AsyncMock(spec=EmbeddingService)
-    service = ResumeProcessingService(embedding_service=mock_embedding_service)
+    mock_summary_service = AsyncMock(spec=ResumeSummaryService)
+    service = ResumeProcessingService(
+        embedding_service=mock_embedding_service,
+        summary_service=mock_summary_service,
+    )
 
     with pytest.raises(ValidationException):
         await service.process_resume(b"corrupted data")
@@ -125,11 +141,42 @@ async def test_resume_processing_provider_error_wrapped():
 
     mock_embedding_service = AsyncMock(spec=EmbeddingService)
     mock_embedding_service.generate_embedding.side_effect = Exception("Ollama connection timed out")
+    mock_summary_service = AsyncMock(spec=ResumeSummaryService)
 
-    service = ResumeProcessingService(embedding_service=mock_embedding_service)
+    service = ResumeProcessingService(
+        embedding_service=mock_embedding_service,
+        summary_service=mock_summary_service,
+    )
 
     with pytest.raises(ExternalServiceException) as exc_info:
         await service.process_resume(pdf_bytes)
 
     assert exc_info.value.error_code == "EMBEDDING_GENERATION_FAILED"
     assert "Failed to generate embedding" in exc_info.value.message
+
+
+@pytest.mark.asyncio
+async def test_resume_processing_summary_service_error_wrapped():
+    """Test that summary service failures are wrapped in ExternalServiceException."""
+    pdf_bytes = create_sample_pdf("Some Resume Text")
+
+    mock_embedding_service = AsyncMock(spec=EmbeddingService)
+    mock_embedding_service.generate_embedding.return_value = EmbeddingResponse(
+        embedding=[0.1, 0.2, 0.3],
+        model="test-embed-model",
+        dimensions=3,
+    )
+
+    mock_summary_service = AsyncMock(spec=ResumeSummaryService)
+    mock_summary_service.generate_summary.side_effect = Exception("AI chat service failed")
+
+    service = ResumeProcessingService(
+        embedding_service=mock_embedding_service,
+        summary_service=mock_summary_service,
+    )
+
+    with pytest.raises(ExternalServiceException) as exc_info:
+        await service.process_resume(pdf_bytes)
+
+    assert exc_info.value.error_code == "SUMMARY_GENERATION_FAILED"
+    assert "Failed to generate summary" in exc_info.value.message

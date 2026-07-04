@@ -3,8 +3,7 @@ from fastapi import Depends
 
 from app.core.exceptions import AppException, ExternalServiceException, ValidationException
 from app.core.logging import get_logger
-from app.providers.base import AIProvider
-from app.providers.factory import get_ai_provider
+from app.application.ai.embedding_service import EmbeddingService
 from app.domain.resume.services.pdf_extraction_service import PDFExtractionService
 from app.domain.resume.services.text_normalization_service import TextNormalizationService
 from app.domain.resume.schemas import ResumeProcessResponse
@@ -17,12 +16,12 @@ class ResumeProcessingService:
 
     def __init__(
         self,
-        ai_provider: AIProvider = Depends(get_ai_provider),
+        embedding_service: EmbeddingService = Depends(EmbeddingService),
         pdf_extractor: PDFExtractionService = Depends(PDFExtractionService),
         text_normalizer: TextNormalizationService = Depends(TextNormalizationService),
     ):
         """Initialize the processing service with its dependent services."""
-        self._ai_provider = ai_provider
+        self._embedding_service = embedding_service
         self._pdf_extractor = pdf_extractor
         self._text_normalizer = text_normalizer
 
@@ -60,10 +59,10 @@ class ResumeProcessingService:
         except Exception as e:
             raise ValidationException(f"Failed to normalize text: {str(e)}")
 
-        # 3. Generate Embedding via AIProvider
+        # 3. Generate Embedding via EmbeddingService
         embed_start = time.perf_counter()
         try:
-            embedding_response = await self._ai_provider.generate_embedding(normalized_text)
+            embedding_response = await self._embedding_service.generate_embedding(normalized_text)
         except AppException:
             raise
         except Exception as e:

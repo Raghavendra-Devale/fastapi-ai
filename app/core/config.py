@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     # File upload settings
     max_resume_size_bytes: int = 10 * 1024 * 1024  # Default to 10MB
 
+    # AI service settings
+    max_embedding_input_length: int = 100000  # Default to 100,000 characters
+
     # Logging settings
     log_level: str = "INFO"
 

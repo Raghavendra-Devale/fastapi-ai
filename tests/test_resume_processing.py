@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 from app.core.exceptions import ExternalServiceException, ValidationException
 from app.providers.base import AIProvider
 from app.providers.models import EmbeddingResponse
+from app.application.ai.embedding_service import EmbeddingService
 from app.domain.resume.services.pdf_extraction_service import PDFExtractionService
 from app.domain.resume.services.text_normalization_service import TextNormalizationService
 from app.domain.resume.services.resume_processing_service import ResumeProcessingService
@@ -88,14 +89,14 @@ async def test_resume_processing_pipeline_success():
     """Test the complete resume processing orchestrator success path."""
     pdf_bytes = create_sample_pdf("John Doe\nSoftware Engineer")
 
-    mock_ai_provider = AsyncMock(spec=AIProvider)
-    mock_ai_provider.generate_embedding.return_value = EmbeddingResponse(
+    mock_embedding_service = AsyncMock(spec=EmbeddingService)
+    mock_embedding_service.generate_embedding.return_value = EmbeddingResponse(
         embedding=[0.1, 0.2, 0.3],
         model="test-embed-model",
         dimensions=3,
     )
 
-    service = ResumeProcessingService(ai_provider=mock_ai_provider)
+    service = ResumeProcessingService(embedding_service=mock_embedding_service)
     response = await service.process_resume(pdf_bytes)
 
     assert response.resume_text == "John Doe\nSoftware Engineer"
@@ -104,14 +105,14 @@ async def test_resume_processing_pipeline_success():
     assert response.embedding_model == "test-embed-model"
     assert response.processing_time_ms > 0
 
-    mock_ai_provider.generate_embedding.assert_called_once_with("John Doe\nSoftware Engineer")
+    mock_embedding_service.generate_embedding.assert_called_once_with("John Doe\nSoftware Engineer")
 
 
 @pytest.mark.asyncio
 async def test_resume_processing_invalid_pdf_propagates():
     """Test that PDF extraction validation failures propagate through orchestrator."""
-    mock_ai_provider = AsyncMock(spec=AIProvider)
-    service = ResumeProcessingService(ai_provider=mock_ai_provider)
+    mock_embedding_service = AsyncMock(spec=EmbeddingService)
+    service = ResumeProcessingService(embedding_service=mock_embedding_service)
 
     with pytest.raises(ValidationException):
         await service.process_resume(b"corrupted data")
@@ -122,10 +123,10 @@ async def test_resume_processing_provider_error_wrapped():
     """Test that provider errors are wrapped in ExternalServiceException."""
     pdf_bytes = create_sample_pdf("Some Resume Text")
 
-    mock_ai_provider = AsyncMock(spec=AIProvider)
-    mock_ai_provider.generate_embedding.side_effect = Exception("Ollama connection timed out")
+    mock_embedding_service = AsyncMock(spec=EmbeddingService)
+    mock_embedding_service.generate_embedding.side_effect = Exception("Ollama connection timed out")
 
-    service = ResumeProcessingService(ai_provider=mock_ai_provider)
+    service = ResumeProcessingService(embedding_service=mock_embedding_service)
 
     with pytest.raises(ExternalServiceException) as exc_info:
         await service.process_resume(pdf_bytes)

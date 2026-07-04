@@ -40,15 +40,18 @@ def test_process_resume_success(mock_app_service):
         
         assert response.status_code == 200
         data = response.json()
-        assert data["success"] is True
-        assert data["resume"]["extracted_text"] == "Extracted Resume Text"
-        assert data["resume"]["embedding_model"] == "test-model"
-        assert data["resume"]["embedding_dimensions"] == 3
-        assert data["resume"]["summary"] == "A professional summary."
-        assert data["resume"]["skills"] == []
-        # Ensure raw embeddings are NOT leaked
-        assert "embedding" not in data["resume"]
+        assert data["extracted_text"] == "Extracted Resume Text"
+        assert data["summary"] == "A professional summary."
+        assert data["skills"] == []
+        assert data["education"] == []
+        assert data["experience"] == []
+        
+        # Ensure no embedding metadata or implementation details are returned
         assert "embedding" not in data
+        assert "embedding_model" not in data
+        assert "embedding_dimensions" not in data
+        assert "success" not in data
+        assert "processing_time_ms" not in data
         
         mock_app_service.process_resume.assert_called_once_with(pdf_content)
 

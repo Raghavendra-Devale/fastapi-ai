@@ -114,3 +114,75 @@ class ResumeProcessAPIResponse(BaseModel):
         }
     }
 
+
+class ResumeIntelligence(BaseModel):
+    """Canonical Resume Intelligence business data (excluding embeddings and AI details)."""
+
+    extracted_text: str = Field(
+        ..., description="The normalized raw text content extracted from the resume."
+    )
+    summary: str | None = Field(
+        None, description="A short, generated professional summary of the candidate."
+    )
+    skills: list[Skill] = Field(
+        default_factory=list,
+        description="The list of skills extracted from the resume.",
+    )
+    education: list[Education] = Field(
+        default_factory=list,
+        description="The list of educational credentials extracted.",
+    )
+    experience: list[Experience] = Field(
+        default_factory=list,
+        description="The list of work history entries extracted.",
+    )
+    certifications: list[Certification] = Field(
+        default_factory=list,
+        description="The list of certifications extracted.",
+    )
+    projects: list[Project] = Field(
+        default_factory=list,
+        description="The list of projects extracted.",
+    )
+    languages: list[Language] = Field(
+        default_factory=list,
+        description="The list of languages spoken by the candidate.",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "extracted_text": "John Doe\nSoftware Engineer\nExperience...",
+                "summary": "Experienced software engineer with a strong background in Python.",
+                "skills": [{"name": "Python", "confidence": 0.95}],
+                "education": [
+                    {
+                        "degree": "B.S. CS",
+                        "institution": "MIT",
+                        "start_date": "2018-09",
+                        "end_date": "2022-06",
+                    }
+                ],
+                "experience": [
+                    {
+                        "company": "Google",
+                        "designation": "SWE",
+                        "start_date": "2022-07",
+                        "end_date": "Present",
+                        "responsibilities": ["Coding"],
+                    }
+                ],
+                "projects": [
+                    {
+                        "name": "AI Engine",
+                        "description": "FastAPI AI Engine",
+                        "technologies": ["FastAPI", "Python"],
+                    }
+                ],
+                "certifications": [{"name": "AWS Pro", "issuer": "Amazon"}],
+                "languages": [{"name": "English", "proficiency": "Native"}],
+            }
+        }
+    }
+
+

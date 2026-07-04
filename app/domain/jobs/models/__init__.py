@@ -1,9 +1,4 @@
-import os
 from pydantic import BaseModel, Field
-
-# Enable namespace package simulation for files co-existing with directories
-__path__ = [os.path.join(os.path.dirname(__file__), "models")]
-
 from app.domain.jobs.models.raw_job import RawJob
 
 

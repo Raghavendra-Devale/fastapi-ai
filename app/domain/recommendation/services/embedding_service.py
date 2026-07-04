@@ -4,23 +4,27 @@ from fastapi import Depends
 from app.core.config import Settings, get_settings
 from app.core.exceptions import ExternalServiceException, ValidationException
 from app.core.logging import get_logger
-from app.providers.base import AIProvider
-from app.providers.factory import get_ai_provider
+from app.domain.ai.providers.interfaces.embedding_provider import EmbeddingProvider
+from app.domain.ai.providers.dependencies import get_embedding_provider
 from app.domain.recommendation.models.recommendation_request import JobDocument
 
 logger = get_logger(__name__)
 
 
 class EmbeddingService:
-    """Domain service to generate vector embeddings for resumes and job documents."""
+    """Domain service to generate vector embeddings for resumes and job documents.
+
+    Acts as the service layer coordinator, delegating the physical model operations
+    to the decoupled EmbeddingProvider interface.
+    """
 
     def __init__(
         self,
-        ai_provider: AIProvider = Depends(get_ai_provider),
+        embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
         settings: Settings = Depends(get_settings),
     ):
-        """Initialize the embedding service with configured AIProvider and application settings."""
-        self._ai_provider = ai_provider
+        """Initialize the embedding service with the EmbeddingProvider interface and settings."""
+        self._embedding_provider = embedding_provider
         self._settings = settings
 
     async def embed_resume(self, resume_text: str) -> list[float]:
@@ -40,10 +44,9 @@ class EmbeddingService:
             raise ValidationException("Resume text cannot be empty or blank.")
 
         try:
-            response = await self._ai_provider.generate_embedding(resume_text.strip())
-            return response.embedding
+            # Delegate to decoupled embedding provider
+            return self._embedding_provider.embed(resume_text.strip())
         except ExternalServiceException:
-            # Re-raise directly to preserve error details and codes
             raise
         except Exception as exc:
             raise ExternalServiceException(
@@ -83,16 +86,16 @@ class EmbeddingService:
             texts.append(text)
 
         try:
-            responses = await self._ai_provider.generate_embeddings(texts)
+            # Delegate to decoupled embedding provider
+            vectors = self._embedding_provider.embed_batch(texts)
             # Ensure the number of returned embeddings matches the input list
-            if len(responses) != len(jobs):
+            if len(vectors) != len(jobs):
                 raise ExternalServiceException(
-                    message="AI provider returned an incomplete batch of embeddings.",
+                    message="Embedding provider returned an incomplete batch of vectors.",
                     error_code="JOB_EMBEDDING_BATCH_MISMATCH",
                 )
-            return [res.embedding for res in responses]
+            return vectors
         except ExternalServiceException:
-            # Re-raise directly to preserve error details and codes
             raise
         except Exception as exc:
             raise ExternalServiceException(

@@ -1,3 +1,5 @@
 from app.domain.recommendation.services.embedding_service import EmbeddingService
 from app.domain.recommendation.services.similarity_service import SimilarityService
 from app.domain.recommendation.services.ranking_service import RankingService
+from app.domain.recommendation.services.explanation_service import ExplanationService
+from app.domain.recommendation.services.recommendation_service import RecommendationService

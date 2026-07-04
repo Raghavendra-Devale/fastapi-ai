@@ -1,16 +1,16 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 from app.core.config import Settings
 from app.core.exceptions import ExternalServiceException, ValidationException
-from app.providers.base import AIProvider, EmbeddingResponse
+from app.domain.ai.providers.interfaces.embedding_provider import EmbeddingProvider
 from app.domain.recommendation.models.recommendation_request import JobDocument
 from app.domain.recommendation.services.embedding_service import EmbeddingService
 
 
 @pytest.fixture
-def mock_ai_provider():
-    return MagicMock(spec=AIProvider)
+def mock_embedding_provider():
+    return MagicMock(spec=EmbeddingProvider)
 
 
 @pytest.fixture
@@ -21,27 +21,20 @@ def mock_settings():
 
 
 @pytest.mark.asyncio
-async def test_embed_resume_success(mock_ai_provider, mock_settings):
-    # Setup mock return value
+async def test_embed_resume_success(mock_embedding_provider, mock_settings):
     expected_embedding = [0.1, 0.2, 0.3]
-    mock_ai_provider.generate_embedding = AsyncMock(
-        return_value=EmbeddingResponse(
-            embedding=expected_embedding,
-            model="test-embedding-model",
-            duration=0.05,
-        )
-    )
+    mock_embedding_provider.embed = MagicMock(return_value=expected_embedding)
 
-    service = EmbeddingService(ai_provider=mock_ai_provider, settings=mock_settings)
+    service = EmbeddingService(embedding_provider=mock_embedding_provider, settings=mock_settings)
     embedding = await service.embed_resume("This is a clean resume text.")
 
     assert embedding == expected_embedding
-    mock_ai_provider.generate_embedding.assert_called_once_with("This is a clean resume text.")
+    mock_embedding_provider.embed.assert_called_once_with("This is a clean resume text.")
 
 
 @pytest.mark.asyncio
-async def test_embed_resume_empty_validation(mock_ai_provider, mock_settings):
-    service = EmbeddingService(ai_provider=mock_ai_provider, settings=mock_settings)
+async def test_embed_resume_empty_validation(mock_embedding_provider, mock_settings):
+    service = EmbeddingService(embedding_provider=mock_embedding_provider, settings=mock_settings)
 
     with pytest.raises(ValidationException) as exc_info:
         await service.embed_resume("")
@@ -51,16 +44,16 @@ async def test_embed_resume_empty_validation(mock_ai_provider, mock_settings):
         await service.embed_resume("   ")
     assert "cannot be empty" in str(exc_info.value)
 
-    mock_ai_provider.generate_embedding.assert_not_called()
+    mock_embedding_provider.embed.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_embed_resume_provider_failure(mock_ai_provider, mock_settings):
-    mock_ai_provider.generate_embedding = AsyncMock(
+async def test_embed_resume_provider_failure(mock_embedding_provider, mock_settings):
+    mock_embedding_provider.embed = MagicMock(
         side_effect=ExternalServiceException("Connection Timeout", error_code="TIMEOUT")
     )
 
-    service = EmbeddingService(ai_provider=mock_ai_provider, settings=mock_settings)
+    service = EmbeddingService(embedding_provider=mock_embedding_provider, settings=mock_settings)
 
     with pytest.raises(ExternalServiceException) as exc_info:
         await service.embed_resume("Some resume text.")
@@ -68,7 +61,7 @@ async def test_embed_resume_provider_failure(mock_ai_provider, mock_settings):
 
 
 @pytest.mark.asyncio
-async def test_embed_jobs_success(mock_ai_provider, mock_settings):
+async def test_embed_jobs_success(mock_embedding_provider, mock_settings):
     jobs = [
         JobDocument(
             title="Software Engineer",
@@ -86,22 +79,19 @@ async def test_embed_jobs_success(mock_ai_provider, mock_settings):
         ),
     ]
 
-    mock_ai_provider.generate_embeddings = AsyncMock(
-        return_value=[
-            EmbeddingResponse(embedding=[0.1, 0.2], model="test", duration=0.01),
-            EmbeddingResponse(embedding=[0.3, 0.4], model="test", duration=0.01),
-        ]
+    mock_embedding_provider.embed_batch = MagicMock(
+        return_value=[[0.1, 0.2], [0.3, 0.4]]
     )
 
-    service = EmbeddingService(ai_provider=mock_ai_provider, settings=mock_settings)
+    service = EmbeddingService(embedding_provider=mock_embedding_provider, settings=mock_settings)
     embeddings = await service.embed_jobs(jobs)
 
     assert len(embeddings) == 2
     assert embeddings[0] == [0.1, 0.2]
     assert embeddings[1] == [0.3, 0.4]
 
-    mock_ai_provider.generate_embeddings.assert_called_once()
-    called_args = mock_ai_provider.generate_embeddings.call_args[0][0]
+    mock_embedding_provider.embed_batch.assert_called_once()
+    called_args = mock_embedding_provider.embed_batch.call_args[0][0]
     assert len(called_args) == 2
     assert "Title: Software Engineer" in called_args[0]
     assert "Description: Coding in Python" in called_args[0]
@@ -109,8 +99,8 @@ async def test_embed_jobs_success(mock_ai_provider, mock_settings):
 
 
 @pytest.mark.asyncio
-async def test_embed_jobs_empty_validation(mock_ai_provider, mock_settings):
-    service = EmbeddingService(ai_provider=mock_ai_provider, settings=mock_settings)
+async def test_embed_jobs_empty_validation(mock_embedding_provider, mock_settings):
+    service = EmbeddingService(embedding_provider=mock_embedding_provider, settings=mock_settings)
 
     with pytest.raises(ValidationException) as exc_info:
         await service.embed_jobs([])
@@ -118,7 +108,7 @@ async def test_embed_jobs_empty_validation(mock_ai_provider, mock_settings):
 
 
 @pytest.mark.asyncio
-async def test_embed_jobs_provider_failure(mock_ai_provider, mock_settings):
+async def test_embed_jobs_provider_failure(mock_embedding_provider, mock_settings):
     jobs = [
         JobDocument(
             title="Software Engineer",
@@ -129,11 +119,11 @@ async def test_embed_jobs_provider_failure(mock_ai_provider, mock_settings):
         )
     ]
 
-    mock_ai_provider.generate_embeddings = AsyncMock(
+    mock_embedding_provider.embed_batch = MagicMock(
         side_effect=ExternalServiceException("Ollama Offline", error_code="PROVIDER_OFFLINE")
     )
 
-    service = EmbeddingService(ai_provider=mock_ai_provider, settings=mock_settings)
+    service = EmbeddingService(embedding_provider=mock_embedding_provider, settings=mock_settings)
 
     with pytest.raises(ExternalServiceException) as exc_info:
         await service.embed_jobs(jobs)

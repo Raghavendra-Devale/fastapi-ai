@@ -58,6 +58,8 @@ class Settings(BaseSettings):
 
     # AI service settings
     max_embedding_input_length: int = 100000  # Default to 100,000 characters
+    enable_ai_explanations: bool = True  # Enable AI explanation generation for recommendations
+
 
     # Logging settings
     log_level: str = "INFO"

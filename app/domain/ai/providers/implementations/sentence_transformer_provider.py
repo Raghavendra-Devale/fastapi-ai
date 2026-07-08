@@ -62,3 +62,12 @@ class SentenceTransformerProvider(EmbeddingProvider):
                 message=f"SentenceTransformer batch embedding generation failed: {str(exc)}",
                 error_code="EMBEDDING_BATCH_GENERATION_FAILED",
             ) from exc
+
+    async def health(self):
+        """Perform a connection health check to the AI provider."""
+        from app.domain.ai.providers.models import HealthResponse
+        return HealthResponse(
+            provider="sentence-transformers",
+            healthy=True,
+            message="Local SentenceTransformer loaded and ready.",
+        )

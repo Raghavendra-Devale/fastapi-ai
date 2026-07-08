@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 
+from app.domain.ai.providers.models import HealthResponse
+
 
 class LLMProvider(ABC):
     """Interface (Abstract Base Class) for Large Language Model generation.
@@ -24,5 +26,14 @@ class LLMProvider(ABC):
 
         Returns:
             str: Generated text content response.
+        """
+        pass
+
+    @abstractmethod
+    async def health(self) -> HealthResponse:
+        """Perform a connection health check to the AI provider.
+
+        Returns:
+            HealthResponse: Standardized response indicating provider availability.
         """
         pass

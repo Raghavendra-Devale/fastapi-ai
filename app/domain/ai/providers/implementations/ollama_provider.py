@@ -87,3 +87,26 @@ class OllamaProvider(LLMProvider):
                 error_code="LLM_GENERATION_FAILED",
                 message=f"Ollama text generation failed: {str(exc)}",
             ) from exc
+
+    async def health(self):
+        """Verify the Ollama provider connection health status."""
+        from app.domain.ai.providers.models import HealthResponse
+        try:
+            # Query downloaded models to verify server responsiveness
+            await self._client.list()
+            return HealthResponse(
+                provider="ollama",
+                healthy=True,
+                message="Ollama service is reachable and healthy.",
+            )
+        except Exception as exc:
+            logger.error(
+                event="provider_health_check_failed",
+                provider="ollama",
+                exc_info=exc,
+            )
+            return HealthResponse(
+                provider="ollama",
+                healthy=False,
+                message=f"Ollama service is unreachable: {str(exc)}",
+            )

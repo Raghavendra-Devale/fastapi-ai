@@ -11,7 +11,8 @@ from app.core.middleware import (
     RequestLoggingMiddleware,
 )
 
-from app.providers.factory import get_ai_provider
+from app.domain.ai.providers.implementations.ollama_provider import OllamaProvider
+from app.domain.ai.providers.implementations.sentence_transformer_provider import SentenceTransformerProvider
 
 # Fetch settings and initialize logging configuration on module load
 settings = get_settings()
@@ -35,19 +36,24 @@ async def lifespan(app: FastAPI):
 
     # Perform startup connection health validation on the configured provider
     try:
-        provider = get_ai_provider(settings)
-        health_status = await provider.health()
-        if health_status.healthy:
+        # Instantiate providers for startup check
+        llm_provider = OllamaProvider(settings)
+        emb_provider = SentenceTransformerProvider(settings)
+        
+        llm_health = await llm_provider.health()
+        emb_health = await emb_provider.health()
+        
+        if llm_health.healthy and emb_health.healthy:
             logger.info(
                 event="provider_health_check_success",
                 provider=settings.provider,
-                message=health_status.message,
+                message=f"LLM: {llm_health.message} | Embedding: {emb_health.message}",
             )
         else:
             logger.warn(
                 event="provider_health_check_warning",
                 provider=settings.provider,
-                message=health_status.message,
+                message=f"LLM: {llm_health.message} | Embedding: {emb_health.message}",
             )
     except Exception as exc:
         logger.warn(

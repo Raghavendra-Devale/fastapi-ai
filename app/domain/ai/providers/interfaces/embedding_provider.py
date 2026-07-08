@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 
+from app.domain.ai.providers.models import HealthResponse
+
 
 class EmbeddingProvider(ABC):
     """Interface (Abstract Base Class) for generating vector embeddings.
@@ -29,5 +31,14 @@ class EmbeddingProvider(ABC):
 
         Returns:
             list[list[float]]: List of generated embedding vectors.
+        """
+        pass
+
+    @abstractmethod
+    async def health(self) -> HealthResponse:
+        """Perform a connection health check to the AI provider.
+
+        Returns:
+            HealthResponse: Standardized response indicating provider availability.
         """
         pass

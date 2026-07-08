@@ -4,9 +4,9 @@ from fastapi import Depends
 from app.core.config import Settings, get_settings
 from app.core.exceptions import ValidationException
 from app.core.logging import get_logger
-from app.providers.base import AIProvider
-from app.providers.factory import get_ai_provider
-from app.providers.models import EmbeddingResponse
+from app.domain.ai.providers.interfaces.embedding_provider import EmbeddingProvider
+from app.domain.ai.providers.dependencies import get_embedding_provider
+from app.domain.ai.providers.models import EmbeddingResponse
 
 logger = get_logger("embedding_service")
 
@@ -28,7 +28,7 @@ class EmbeddingService:
 
     def __init__(
         self,
-        ai_provider: AIProvider = Depends(get_ai_provider),
+        ai_provider: EmbeddingProvider = Depends(get_embedding_provider),
         settings: Settings = Depends(get_settings),
     ):
         """Initialize the embedding service with the active provider and settings."""
@@ -65,8 +65,14 @@ class EmbeddingService:
 
         # 3. Call AIProvider
         start_time = time.perf_counter()
-        embedding_response = await self._ai_provider.generate_embedding(normalized)
+        vector = self._ai_provider.embed(normalized)
         duration_ms = (time.perf_counter() - start_time) * 1000.0
+
+        embedding_response = EmbeddingResponse(
+            embedding=vector,
+            model=self._settings.embedding_model,
+            dimensions=len(vector)
+        )
 
         # 4. Logging (model, dimensions, duration. Never log text, prompts, embeddings)
         logger.info(

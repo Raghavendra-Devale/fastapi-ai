@@ -3,8 +3,7 @@ import pytest
 from unittest.mock import AsyncMock
 
 from app.core.exceptions import ExternalServiceException, ValidationException
-from app.providers.base import AIProvider
-from app.providers.models import EmbeddingResponse
+from app.domain.ai.providers.models import EmbeddingResponse
 from app.application.ai.embedding_service import EmbeddingService
 from app.domain.resume.services.pdf_extraction_service import PDFExtractionService
 from app.domain.resume.services.text_normalization_service import TextNormalizationService

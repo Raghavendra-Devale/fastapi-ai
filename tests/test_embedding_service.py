@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock
 from app.application.ai.embedding_service import EmbeddingService
 from app.core.config import Settings
 from app.core.exceptions import ValidationException
-from app.providers.base import AIProvider
-from app.providers.models import EmbeddingResponse
+from app.domain.ai.providers.interfaces.embedding_provider import EmbeddingProvider
+from app.domain.ai.providers.models import EmbeddingResponse
 
 
 @pytest.fixture
@@ -24,12 +24,8 @@ def mock_settings():
 @pytest.mark.asyncio
 async def test_embedding_service_success(mock_settings):
     """Test successful embedding generation with validation and normalization."""
-    mock_provider = AsyncMock(spec=AIProvider)
-    mock_provider.generate_embedding.return_value = EmbeddingResponse(
-        embedding=[0.1, 0.2, 0.3],
-        model="test-model",
-        dimensions=3,
-    )
+    mock_provider = AsyncMock(spec=EmbeddingProvider)
+    mock_provider.embed.return_value = [0.1, 0.2, 0.3]
 
     service = EmbeddingService(ai_provider=mock_provider, settings=mock_settings)
 
@@ -40,13 +36,13 @@ async def test_embedding_service_success(mock_settings):
     assert response.model == "test-model"
     assert response.dimensions == 3
     # Check that text was normalized (stripped) before calling provider
-    mock_provider.generate_embedding.assert_called_once_with("some text")
+    mock_provider.embed.assert_called_once_with("some text")
 
 
 @pytest.mark.asyncio
 async def test_embedding_service_validation_empty(mock_settings):
     """Test that empty or blank inputs raise a ValidationException."""
-    mock_provider = AsyncMock(spec=AIProvider)
+    mock_provider = AsyncMock(spec=EmbeddingProvider)
     service = EmbeddingService(ai_provider=mock_provider, settings=mock_settings)
 
     # Empty string
@@ -59,13 +55,13 @@ async def test_embedding_service_validation_empty(mock_settings):
         await service.generate_embedding("   ")
     assert "blank" in str(exc_info.value).lower()
 
-    mock_provider.generate_embedding.assert_not_called()
+    mock_provider.embed.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_embedding_service_validation_oversized(mock_settings):
     """Test that input exceeding length limit raises a ValidationException."""
-    mock_provider = AsyncMock(spec=AIProvider)
+    mock_provider = AsyncMock(spec=EmbeddingProvider)
     service = EmbeddingService(ai_provider=mock_provider, settings=mock_settings)
 
     # limit is 50, let's send 51 characters
@@ -74,14 +70,14 @@ async def test_embedding_service_validation_oversized(mock_settings):
         await service.generate_embedding(long_text)
     assert "exceeds" in str(exc_info.value).lower()
 
-    mock_provider.generate_embedding.assert_not_called()
+    mock_provider.embed.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_embedding_service_provider_failure(mock_settings):
     """Test that provider errors propagate correctly."""
-    mock_provider = AsyncMock(spec=AIProvider)
-    mock_provider.generate_embedding.side_effect = RuntimeError("Ollama connection failed")
+    mock_provider = AsyncMock(spec=EmbeddingProvider)
+    mock_provider.embed.side_effect = RuntimeError("Ollama connection failed")
 
     service = EmbeddingService(ai_provider=mock_provider, settings=mock_settings)
 

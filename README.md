@@ -10,27 +10,22 @@ A backend service built with FastAPI, integrated with AI features including embe
 fastapi-ai/
 ├── app/
 │   ├── api/
+│   │   ├── health/             # Health API controllers
+│   │   ├── recommendations/    # Recommendations API controllers
 │   │   └── v1/
-│   │       ├── endpoints/
-│   │       │   ├── resume.py       # Resume parsing endpoint
-│   │       │   └── health.py       # Dependency health checker
-│   │       └── router.py           # Endpoint mounting router
-│   ├── core/           # Configuration, security, database sessions
-│   ├── providers/      # Third-party integrations (e.g., LLM APIs, email)
-│   ├── embeddings/     # Custom embedding generation services (sentence-transformers)
-│   ├── vectorstores/   # Vector database setup and queries (pgvector)
-│   ├── recommendations/# ML/rules-based recommendation engines
-│   │   ├── services/
-│   │   │   ├── ranking_service.py     # Cosine similarity ranking
-│   │   │   └── explanation_service.py # Ollama LLM match text generator
-│   │   └── models/     # Pydantic schemas (RecommendationRequest/Response)
-│   ├── services/       # Core business logic
-│   ├── schemas/        # Pydantic schemas (request/response validation)
-│   ├── models/         # SQLAlchemy/database models
-│   ├── workers/        # Background/Celery task workers
-│   ├── prompts/        # Prompt templates for LLM tasks
-│   ├── utils/          # Helper/utility scripts
-│   └── main.py         # Application entry point
+│   │       ├── endpoints/      # API endpoints (resume parsing)
+│   │       └── router.py       # API Router
+│   ├── application/            # Application use-case orchestrators
+│   │   ├── ai/                 # App-level AI embeddings orchestrator
+│   │   └── resume/             # App-level resume processing orchestrator
+│   ├── core/                   # Configuration, exceptions, logging, middleware
+│   ├── domain/                 # Domain entities, services and logic boundaries
+│   │   ├── ai/                 # LLM/Embedding provider interfaces & models
+│   │   ├── jobs/               # Domain job model & parser types
+│   │   ├── recommendation/     # Cosine scoring & match explanations
+│   │   └── resume/             # Domain PDF extractor & text normalizer
+│   ├── utils/                  # Helper & utility functions
+│   └── main.py                 # Application entry point & lifecycle hooks
 ├── tests/              # Pytest test suite
 ├── .env                # Local environment secrets
 ├── .env.example        # Reference environment variables

@@ -5,7 +5,7 @@ from app.domain.jobs.models.raw_job import RawJob
 from app.domain.jobs.job_profile import JobProfile
 from app.domain.jobs.services.job_normalization_service import JobNormalizationService
 from app.application.jobs.job_normalizer_service import JobNormalizerService
-from app.application.jobs.job_analyzer_service import JobAnalyzerService
+from app.application.jobs.job_analyzer_service import JobAnalyzer, MockJobAnalyzer
 from app.application.jobs.job_embedding_service import JobEmbeddingService
 from app.application.jobs.job_persistence_service import JobPersistenceService
 from app.application.pipelines.job_pipeline import JobPipeline
@@ -39,9 +39,9 @@ def test_job_normalizer_service():
 
 @pytest.mark.asyncio
 async def test_job_analyzer_service():
-    service = JobAnalyzerService()
+    service = MockJobAnalyzer()
     raw_job = RawJob(title="Backend Dev", company="Uber")
-    profile = await service.analyze_job(raw_job)
+    profile = await service.analyze(raw_job)
     
     assert isinstance(profile, JobProfile)
     assert profile.title == "Backend Dev"
@@ -89,8 +89,8 @@ async def test_job_pipeline_run():
     mock_normalizer = MagicMock(spec=JobNormalizerService)
     mock_normalizer.normalize_job.return_value = "Normalized Text"
     
-    mock_analyzer = AsyncMock(spec=JobAnalyzerService)
-    mock_analyzer.analyze_job.return_value = JobProfile(
+    mock_analyzer = AsyncMock(spec=JobAnalyzer)
+    mock_analyzer.analyze.return_value = JobProfile(
         title="SRE",
         company="Netflix",
     )
@@ -116,7 +116,7 @@ async def test_job_pipeline_run():
     assert result.normalized_job == "Normalized Text"
     
     mock_normalizer.normalize_job.assert_called_once_with(raw_job)
-    mock_analyzer.analyze_job.assert_called_once_with(raw_job)
+    mock_analyzer.analyze.assert_called_once_with(raw_job)
     mock_embedding.generate_embedding.assert_called_once_with(result.job_profile)
     mock_persistence.save_job_analysis.assert_called_once_with(
         job_profile=result.job_profile,

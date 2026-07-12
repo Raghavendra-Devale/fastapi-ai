@@ -37,9 +37,28 @@ class PromptManager:
         Expected formatting keys: {job_description}
         """
         return (
-            "Analyze the following job description and extract the structured job details. "
-            "Return the output as a valid JSON object matching the JobProfile schema.\n\n"
-            "Job Description:\n{job_description}"
+            "You are an expert job parsing system. Analyze the following job description and extract "
+            "the structured job details.\n\n"
+            "Job Description:\n{job_description}\n\n"
+            "Format the extracted information into a single valid JSON object containing exactly these fields:\n"
+            "- title (string): The job title\n"
+            "- company (string): The hiring company name\n"
+            "- summary (string or null): A brief summary of the job description\n"
+            "- required_skills (array of strings): List of required skill names\n"
+            "- preferred_skills (array of strings): List of preferred skill names\n"
+            "- experience (string or null): Detailed professional experience requirements\n"
+            "- education (string or null): Education or degree requirements\n"
+            "- employment_type (string or null): Employment type (e.g., Full-time, Contract, Part-time)\n"
+            "- location (string or null): Job location\n"
+            "- salary (string or null): Salary or compensation package information\n"
+            "- industry (string or null): The industry field of the job/company\n"
+            "- responsibilities (array of strings): List of job responsibilities and duties\n"
+            "- requirements (array of strings): List of core requirements for the candidate\n"
+            "- benefits (array of strings): List of benefits offered by the company\n"
+            "- technologies (array of strings): List of tools, languages, and technologies used\n"
+            "- keywords (array of strings): Keywords/tags extracted for categorization\n\n"
+            "Return ONLY raw valid JSON text matching the schema. Do not include markdown code block blocks (such as ```json), "
+            "no preamble, no conversational prose, and no explanations."
         )
 
     @staticmethod

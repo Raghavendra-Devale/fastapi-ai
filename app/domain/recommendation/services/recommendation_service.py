@@ -31,7 +31,8 @@ class RecommendationService:
         self,
         request: RecommendationRequest,
     ) -> RecommendationResponse:
-        """Coordinate embedding, similarity scoring, ranking, and explanation pipelines to generate job recommendations.
+        """Coordinate embedding, similarity scoring, ranking, and explanation pipelines to
+         generate job recommendations.
 
         Args:
             request (RecommendationRequest): Normalized resume text and job documents.

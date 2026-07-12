@@ -3,34 +3,36 @@ from unittest.mock import AsyncMock
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.application.resume.resume_application_service import ResumeApplicationService
-from app.domain.resume.schemas import ResumeProcessResponse
+from app.application.pipelines.resume_pipeline import ResumePipeline
+from app.domain.resume.candidate_profile import CandidateProfile
+from app.domain.resume.resume_analysis_result import ResumeAnalysisResult
 
 
 @pytest.fixture
-def mock_app_service():
-    from app.domain.resume.models import ResumeIntelligence, EmbeddingMetadata
-    mock_service = AsyncMock(spec=ResumeApplicationService)
-    # Store standard response
-    mock_service.process_resume.return_value = ResumeProcessResponse(
-        resume_text="Extracted Resume Text",
+def mock_pipeline():
+    mock_pipe = AsyncMock(spec=ResumePipeline)
+    mock_pipe.run.return_value = ResumeAnalysisResult(
+        extracted_text="Extracted Resume Text",
         embedding=[0.1, 0.2, 0.3],
-        embedding_dimensions=3,
-        embedding_model="test-model",
-        processing_time_ms=12.34,
-        summary="A professional summary.",
-        intelligence=ResumeIntelligence(
-            extracted_text="Extracted Resume Text",
+        suggestions=[],
+        candidate_profile=CandidateProfile(
+            name="John Doe",
+            headline="Software Engineer",
             summary="A professional summary.",
-            embedding=EmbeddingMetadata(model="test-model", dimensions=3),
-        ),
+            experience_years=5.0,
+            skills=[],
+            projects=[],
+            education=[],
+            certifications=[],
+            languages=[],
+        )
     )
-    return mock_service
+    return mock_pipe
 
 
-def test_process_resume_success(mock_app_service):
+def test_process_resume_success(mock_pipeline):
     """Test successful resume processing through the API endpoint."""
-    app.dependency_overrides[ResumeApplicationService] = lambda: mock_app_service
+    app.dependency_overrides[ResumePipeline] = lambda: mock_pipeline
 
     pdf_content = b"%PDF-1.4 mock pdf content"
     files = {"file": ("resume.pdf", pdf_content, "application/pdf")}
@@ -53,14 +55,14 @@ def test_process_resume_success(mock_app_service):
         assert "success" not in data
         assert "processing_time_ms" not in data
         
-        mock_app_service.process_resume.assert_called_once_with(pdf_content)
+        mock_pipeline.run.assert_called_once_with(pdf_content)
 
     app.dependency_overrides.clear()
 
 
-def test_process_resume_rejects_non_pdf(mock_app_service):
+def test_process_resume_rejects_non_pdf(mock_pipeline):
     """Test that non-PDF files are rejected with a 400 validation error."""
-    app.dependency_overrides[ResumeApplicationService] = lambda: mock_app_service
+    app.dependency_overrides[ResumePipeline] = lambda: mock_pipeline
 
     # Invalid extension
     files = {"file": ("resume.txt", b"some text content", "text/plain")}
@@ -81,13 +83,13 @@ def test_process_resume_rejects_non_pdf(mock_app_service):
         assert data["success"] is False
         assert "Only PDF files are accepted" in data["error"]["message"]
 
-    mock_app_service.process_resume.assert_not_called()
+    mock_pipeline.run.assert_not_called()
     app.dependency_overrides.clear()
 
 
-def test_process_resume_rejects_empty_file(mock_app_service):
+def test_process_resume_rejects_empty_file(mock_pipeline):
     """Test that empty files are rejected with a 400 validation error."""
-    app.dependency_overrides[ResumeApplicationService] = lambda: mock_app_service
+    app.dependency_overrides[ResumePipeline] = lambda: mock_pipeline
 
     files = {"file": ("resume.pdf", b"", "application/pdf")}
 
@@ -98,13 +100,13 @@ def test_process_resume_rejects_empty_file(mock_app_service):
         assert data["success"] is False
         assert "empty" in data["error"]["message"].lower()
 
-    mock_app_service.process_resume.assert_not_called()
+    mock_pipeline.run.assert_not_called()
     app.dependency_overrides.clear()
 
 
-def test_process_resume_rejects_oversized_file(mock_app_service):
+def test_process_resume_rejects_oversized_file(mock_pipeline):
     """Test that files exceeding the size limit are rejected with a 400 validation error."""
-    app.dependency_overrides[ResumeApplicationService] = lambda: mock_app_service
+    app.dependency_overrides[ResumePipeline] = lambda: mock_pipeline
 
     # Override Settings to have max_resume_size_bytes = 10
     from app.core.config import get_settings, Settings
@@ -130,5 +132,5 @@ def test_process_resume_rejects_oversized_file(mock_app_service):
         assert data["success"] is False
         assert "exceeds" in data["error"]["message"].lower()
 
-    mock_app_service.process_resume.assert_not_called()
+    mock_pipeline.run.assert_not_called()
     app.dependency_overrides.clear()

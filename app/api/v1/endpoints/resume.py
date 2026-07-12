@@ -1,7 +1,7 @@
 import time
 from fastapi import APIRouter, Depends, File, UploadFile
 
-from app.application.resume.resume_application_service import ResumeApplicationService
+from app.application.pipelines.resume_pipeline import ResumePipeline
 from app.core.config import Settings, get_settings
 from app.core.exceptions import ValidationException
 from app.core.logging import get_logger
@@ -12,14 +12,15 @@ logger = get_logger("resume_endpoint")
 
 
 class ResumeController:
-    """Thin controller layer to validate resume upload requests, orchestrate application flow, and format responses."""
+    """Thin controller layer to validate resume upload requests, orchestrate application flow,
+    and format responses."""
 
     def __init__(
         self,
-        application_service: ResumeApplicationService = Depends(ResumeApplicationService),
+        resume_pipeline: ResumePipeline = Depends(ResumePipeline),
     ):
         """Initialize ResumeController with dependencies."""
-        self._application_service = application_service
+        self._resume_pipeline = resume_pipeline
 
     async def process_resume(self, file: UploadFile, settings: Settings) -> ResumeIntelligenceSchema:
         """Validate, parse, and process the uploaded PDF file to extract ResumeIntelligence."""
@@ -51,32 +52,20 @@ class ResumeController:
 
         start_time = time.perf_counter()
         try:
-            # 5. Call ResumeApplicationService
-            domain_response = await self._application_service.process_resume(pdf_bytes)
+            # 5. Call ResumePipeline
+            result = await self._resume_pipeline.run(pdf_bytes)
 
-            # 6. Extract ResumeIntelligence and map to business schema
-            intelligence = domain_response.intelligence
-            if not intelligence:
-                from app.domain.resume.models import ResumeIntelligence as DomainResumeIntelligence, EmbeddingMetadata
-                intelligence = DomainResumeIntelligence(
-                    extracted_text=domain_response.resume_text,
-                    summary=domain_response.summary,
-                    embedding=EmbeddingMetadata(
-                        model=domain_response.embedding_model,
-                        dimensions=domain_response.embedding_dimensions,
-                    ),
-                )
-
-            # Map the domain model directly to the business-only response schema
+            # 6. Extract CandidateProfile and map to business schema
+            profile = result.candidate_profile
             return ResumeIntelligenceSchema(
-                extracted_text=intelligence.extracted_text,
-                summary=intelligence.summary,
-                skills=intelligence.skills,
-                education=intelligence.education,
-                experience=intelligence.experience,
-                certifications=intelligence.certifications,
-                projects=intelligence.projects,
-                languages=intelligence.languages,
+                extracted_text=result.extracted_text,
+                summary=profile.summary,
+                skills=profile.skills,
+                education=profile.education,
+                experience=profile.experience,
+                certifications=profile.certifications,
+                projects=profile.projects,
+                languages=profile.languages,
             )
         finally:
             duration_ms = (time.perf_counter() - start_time) * 1000.0

@@ -47,8 +47,11 @@ class RecommendationPipeline:
         ranked_recommendations = await self._ranking.rank_jobs(candidate_profile, job_profiles)
 
         # 3. Recommendation Reason
-        for rec in ranked_recommendations:
-            self._reason_service.generate_reason(rec)
+        import asyncio
+        await asyncio.gather(*(
+            self._reason_service.generate_reason(rec, candidate_profile)
+            for rec in ranked_recommendations
+        ))
 
         # 4. Persistence
         await self._persistence.save_recommendations(ranked_recommendations)

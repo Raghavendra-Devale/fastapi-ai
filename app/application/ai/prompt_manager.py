@@ -77,13 +77,19 @@ class PromptManager:
     def recommendation_reason() -> str:
         """Returns the prompt template for generating recommendation explanations.
 
-        Expected formatting keys: {candidate_profile}, {job_profile}
+        Expected formatting keys: {candidate_profile}, {job_profile}, {scores}
         """
         return (
-            "Provide a brief, compelling, and professional reason explaining why the following job "
-            "is a good match for the candidate. Return the output as a plain text reason.\n\n"
+            "You are an expert recruitment assistant explaining why a job is recommended for a candidate.\n\n"
             "Candidate Profile:\n{candidate_profile}\n\n"
-            "Job Profile:\n{job_profile}"
+            "Job Profile:\n{job_profile}\n\n"
+            "Deterministic Match Scores:\n{scores}\n\n"
+            "Generate a professional, structured explanation of the match. Focus on the factual alignment "
+            "and discrepancies from the profile and match scores (e.g. matched skills, missing skills, experience comparison).\n\n"
+            "Return a valid JSON object containing exactly this key:\n"
+            "- bullet_points (array of strings): A list of 3-5 concise, actionable bullet points explaining the match, such as "
+            "'Strong Java & Spring Boot alignment', 'PostgreSQL experience matches', 'Missing Kafka experience', 'Experience slightly below preferred'.\n\n"
+            "Return ONLY raw valid JSON text. Do not include markdown code block syntax (like ```json), no preamble, and no explanations."
         )
 
     @staticmethod

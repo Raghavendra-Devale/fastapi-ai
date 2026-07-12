@@ -1,34 +1,41 @@
+from fastapi import Depends
+from app.domain.resume.candidate_profile import CandidateProfile
 from app.domain.recommendation.recommendation_result import RecommendationResult
+from app.application.recommendation.recommendation_reason_generator import ReasonAnalyzer, get_reason_analyzer
 
 
 class RecommendationReasonService:
     """Service responsible for generating recommendation reasons for Ranked Jobs."""
 
-    def __init__(self):
-        pass
+    def __init__(
+        self,
+        reason_analyzer: ReasonAnalyzer = Depends(get_reason_analyzer),
+    ):
+        """Initialize service with reasoning analyzer dependency."""
+        self._reason_analyzer = reason_analyzer
 
-    def generate_reason(self, result: RecommendationResult) -> RecommendationResult:
-        """Populate the recommendation reason of a Ranked Job Recommendation.
+    async def generate_reason(
+        self,
+        result: RecommendationResult,
+        candidate_profile: CandidateProfile,
+    ) -> RecommendationResult:
+        """Populate the recommendation reason of a Ranked Job Recommendation using ReasonAnalyzer.
 
         Args:
             result (RecommendationResult): Ranked recommendation.
+            candidate_profile (CandidateProfile): Candidate profile context.
 
         Returns:
             RecommendationResult: Enriched recommendation.
         """
-        # Phase 3: Rule-based placeholder explanation logic (no LLM yet)
-        title = result.job_profile.title
-        company = result.job_profile.company
-        
-        # Determine explanation based on skill match or score
-        score_percent = int(result.similarity_score * 100)
-        
-        if score_percent >= 80:
-            reason = f"Strong match for {title} at {company} with a semantic similarity score of {score_percent}%."
-        elif score_percent >= 50:
-            reason = f"Good match for {title} at {company} ({score_percent}% similarity). Consider adding missing skills: {', '.join(result.missing_skills[:3])}."
-        else:
-            reason = f"Low similarity match ({score_percent}%) for {title} at {company}."
-            
-        result.recommendation_reason = reason
+        # Call the reasoning analyzer to extract bullet points
+        reason_data = await self._reason_analyzer.analyze(
+            result=result,
+            candidate_profile=candidate_profile,
+            job_profile=result.job_profile,
+        )
+
+        # Format list of bullet points as structured text block
+        formatted_bullets = "\n".join(f"• {bp}" for bp in reason_data.bullet_points)
+        result.recommendation_reason = formatted_bullets
         return result

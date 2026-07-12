@@ -1,12 +1,11 @@
 from fastapi import Depends
 
-from app.core.config import Settings, get_settings
 from app.domain.recommendation.models.recommendation_request import RecommendationRequest
-from app.domain.recommendation.models.recommendation_response import RecommendationResponse
-from app.domain.recommendation.services.embedding_service import EmbeddingService
-from app.domain.recommendation.services.similarity_service import SimilarityService
-from app.domain.recommendation.services.ranking_service import RankingService
-from app.domain.recommendation.services.explanation_service import ExplanationService
+from app.domain.recommendation.models.recommendation_response import RecommendationResponse, RecommendationItem
+from app.domain.jobs.models.raw_job import RawJob
+from app.application.resume.resume_analyzer_service import ResumeAnalyzer, get_resume_analyzer
+from app.application.jobs.job_analyzer_service import JobAnalyzer, get_job_analyzer
+from app.application.pipelines.recommendation_pipeline import RecommendationPipeline
 
 
 class RecommendationService:
@@ -14,18 +13,14 @@ class RecommendationService:
 
     def __init__(
         self,
-        embedding_service: EmbeddingService = Depends(EmbeddingService),
-        similarity_service: SimilarityService = Depends(SimilarityService),
-        ranking_service: RankingService = Depends(RankingService),
-        explanation_service: ExplanationService = Depends(ExplanationService),
-        settings: Settings = Depends(get_settings),
+        resume_analyzer = Depends(get_resume_analyzer),
+        job_analyzer = Depends(get_job_analyzer),
+        recommendation_pipeline: RecommendationPipeline = Depends(RecommendationPipeline),
     ):
-        """Initialize the orchestration service with downstream recommendation services."""
-        self._embedding_service = embedding_service
-        self._similarity_service = similarity_service
-        self._ranking_service = ranking_service
-        self._explanation_service = explanation_service
-        self._settings = settings
+        """Initialize the orchestration service with the new pipeline dependencies."""
+        self._resume_analyzer: ResumeAnalyzer = resume_analyzer
+        self._job_analyzer: JobAnalyzer = job_analyzer
+        self._recommendation_pipeline = recommendation_pipeline
 
     async def generate_recommendations(
         self,
@@ -40,24 +35,45 @@ class RecommendationService:
         Returns:
             RecommendationResponse: Ranked list of recommendation items.
         """
-        # 1. Generate resume embedding
-        resume_emb = await self._embedding_service.embed_resume(request.resume_text)
+        # 1. Analyze resume text to produce CandidateProfile
+        candidate_profile = await self._resume_analyzer.analyze(request.resume_text)
 
-        # 2. Generate embeddings for all jobs
-        job_embs = await self._embedding_service.embed_jobs(request.jobs)
+        # 2. Analyze job documents to produce JobProfiles
+        job_profiles = []
+        for jd in request.jobs:
+            raw_job = RawJob(
+                title=jd.title,
+                company=jd.company,
+                location=jd.location,
+                description=jd.description,
+                apply_url=jd.apply_url,
+                employment_type=jd.employment_type,
+            )
+            job_profile = await self._job_analyzer.analyze(raw_job)
+            # Map apply_url to JobProfile (it may not exist in LLM output)
+            job_profile.apply_url = jd.apply_url
+            job_profiles.append(job_profile)
 
-        # 3. Calculate similarity scores
-        scores = self._similarity_service.calculate_similarity(resume_emb, job_embs)
+        # 3. Execute the recommendation pipeline
+        results = await self._recommendation_pipeline.run(
+            candidate_profile=candidate_profile,
+            job_profiles=job_profiles,
+        )
 
-        # 4. Rank recommendations
-        ranked_items = self._ranking_service.rank(request.jobs, scores)
-
-        # 5. If explanation generation is enabled, generate explanations for the top recommendations.
-        if self._settings.enable_ai_explanations and self._explanation_service:
-            ranked_items = await self._explanation_service.explain_recommendations(
-                request.resume_text,
-                ranked_items,
+        # 4. Map to RecommendationResponse items
+        recommendations = []
+        for res in results:
+            recommendations.append(
+                RecommendationItem(
+                    title=res.job_profile.title,
+                    company=res.job_profile.company,
+                    location=res.job_profile.location,
+                    description=res.job_profile.summary or "",
+                    employment_type=res.job_profile.employment_type,
+                    apply_url=res.job_profile.apply_url or "",
+                    similarity_score=res.final_score,  # Expose final score as similarity_score for contract compatibility
+                    recommendation_reason=res.recommendation_reason,
+                )
             )
 
-        # 6. Return RecommendationResponse
-        return RecommendationResponse(recommendations=ranked_items)
+        return RecommendationResponse(recommendations=recommendations)

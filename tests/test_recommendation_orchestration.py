@@ -1,151 +1,76 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from app.core.config import Settings
 from app.domain.recommendation.models.recommendation_request import JobDocument, RecommendationRequest
-from app.domain.recommendation.models.recommendation_response import RecommendationItem, RecommendationResponse
-from app.domain.recommendation.services.embedding_service import EmbeddingService
-from app.domain.recommendation.services.similarity_service import SimilarityService
-from app.domain.recommendation.services.ranking_service import RankingService
-from app.domain.recommendation.services.explanation_service import ExplanationService
+from app.domain.recommendation.models.recommendation_response import RecommendationResponse
+from app.application.resume.resume_analyzer_service import ResumeAnalyzer
+from app.application.jobs.job_analyzer_service import JobAnalyzer
+from app.domain.jobs.job_profile import JobProfile
+from app.domain.resume.candidate_profile import CandidateProfile
+from app.domain.recommendation.recommendation_result import RecommendationResult
+from app.application.pipelines.recommendation_pipeline import RecommendationPipeline
 from app.domain.recommendation.services.recommendation_service import RecommendationService
 
 
-@pytest.fixture
-def mock_embedding_service():
-    service = MagicMock(spec=EmbeddingService)
-    service.embed_resume = AsyncMock(return_value=[0.1, 0.2])
-    service.embed_jobs = AsyncMock(return_value=[[0.3, 0.4], [0.5, 0.6]])
-    return service
+@pytest.mark.asyncio
+async def test_recommendation_orchestration_new_pipeline():
+    # Arrange
+    mock_resume_analyzer = AsyncMock(spec=ResumeAnalyzer)
+    mock_candidate = CandidateProfile(name="Alice")
+    mock_resume_analyzer.analyze.return_value = mock_candidate
 
+    mock_job_analyzer = AsyncMock(spec=JobAnalyzer)
+    mock_job_profile = JobProfile(title="Developer", company="TechCorp")
+    mock_job_analyzer.analyze.return_value = mock_job_profile
 
-@pytest.fixture
-def mock_similarity_service():
-    service = MagicMock(spec=SimilarityService)
-    service.calculate_similarity = MagicMock(return_value=[0.8, 0.9])
-    return service
+    mock_pipeline = AsyncMock(spec=RecommendationPipeline)
+    mock_result = RecommendationResult(
+        job_profile=mock_job_profile,
+        semantic_score=0.9,
+        skill_score=0.8,
+        experience_score=0.7,
+        location_score=1.0,
+        education_score=1.0,
+        final_score=0.85,
+        matched_skills=["Python"],
+        missing_skills=[],
+        recommendation_reason="Strong Python matches",
+    )
+    mock_pipeline.run.return_value = [mock_result]
 
+    service = RecommendationService(
+        resume_analyzer=mock_resume_analyzer,
+        job_analyzer=mock_job_analyzer,
+        recommendation_pipeline=mock_pipeline,
+    )
 
-@pytest.fixture
-def mock_ranking_service():
-    service = MagicMock(spec=RankingService)
-    ranked_items = [
-        RecommendationItem(
-            title="SWE 2",
-            company="Beta Corp",
-            description="Coding 2",
-            apply_url="https://beta.corp/2",
-            similarity_score=0.9,
-            recommendation_reason=None,
-        ),
-        RecommendationItem(
-            title="SWE 1",
-            company="Acme Corp",
-            description="Coding 1",
-            apply_url="https://acme.corp/1",
-            similarity_score=0.8,
-            recommendation_reason=None,
-        ),
-    ]
-    service.rank = MagicMock(return_value=ranked_items)
-    return service
-
-
-@pytest.fixture
-def mock_explanation_service():
-    service = MagicMock(spec=ExplanationService)
-    explained_items = [
-        RecommendationItem(
-            title="SWE 2",
-            company="Beta Corp",
-            description="Coding 2",
-            apply_url="https://beta.corp/2",
-            similarity_score=0.9,
-            recommendation_reason="Excellent match based on skills.",
-        ),
-        RecommendationItem(
-            title="SWE 1",
-            company="Acme Corp",
-            description="Coding 1",
-            apply_url="https://acme.corp/1",
-            similarity_score=0.8,
-            recommendation_reason="Good match based on role.",
-        ),
-    ]
-    service.explain_recommendations = AsyncMock(return_value=explained_items)
-    return service
-
-
-@pytest.fixture
-def test_request():
-    return RecommendationRequest(
-        resume_text="Experienced Python Developer",
+    request = RecommendationRequest(
+        resume_text="Experienced developer",
         jobs=[
-            JobDocument(title="SWE 1", company="Acme Corp", description="Coding 1", apply_url="https://acme.corp/1"),
-            JobDocument(title="SWE 2", company="Beta Corp", description="Coding 2", apply_url="https://beta.corp/2"),
+            JobDocument(
+                title="Developer",
+                company="TechCorp",
+                description="Write Python code",
+                apply_url="https://tech.corp/apply"
+            )
         ]
     )
 
+    # Act
+    response = await service.generate_recommendations(request)
 
-@pytest.mark.asyncio
-async def test_recommendation_orchestration_explanations_enabled(
-    mock_embedding_service,
-    mock_similarity_service,
-    mock_ranking_service,
-    mock_explanation_service,
-    test_request,
-):
-    settings = MagicMock(spec=Settings)
-    settings.enable_ai_explanations = True
-
-    service = RecommendationService(
-        embedding_service=mock_embedding_service,
-        similarity_service=mock_similarity_service,
-        ranking_service=mock_ranking_service,
-        explanation_service=mock_explanation_service,
-        settings=settings,
-    )
-
-    response = await service.generate_recommendations(test_request)
-
+    # Assert
     assert isinstance(response, RecommendationResponse)
-    assert len(response.recommendations) == 2
-    assert response.recommendations[0].recommendation_reason == "Excellent match based on skills."
+    assert len(response.recommendations) == 1
+    item = response.recommendations[0]
+    assert item.title == "Developer"
+    assert item.company == "TechCorp"
+    assert item.similarity_score == 0.85  # Maps to final_score
+    assert item.recommendation_reason == "Strong Python matches"
 
-    mock_embedding_service.embed_resume.assert_called_once_with("Experienced Python Developer")
-    mock_embedding_service.embed_jobs.assert_called_once_with(test_request.jobs)
-    mock_similarity_service.calculate_similarity.assert_called_once_with([0.1, 0.2], [[0.3, 0.4], [0.5, 0.6]])
-    mock_ranking_service.rank.assert_called_once_with(test_request.jobs, [0.8, 0.9])
-    mock_explanation_service.explain_recommendations.assert_called_once_with("Experienced Python Developer", mock_ranking_service.rank.return_value)
-
-
-@pytest.mark.asyncio
-async def test_recommendation_orchestration_explanations_disabled(
-    mock_embedding_service,
-    mock_similarity_service,
-    mock_ranking_service,
-    mock_explanation_service,
-    test_request,
-):
-    settings = MagicMock(spec=Settings)
-    settings.enable_ai_explanations = False
-
-    service = RecommendationService(
-        embedding_service=mock_embedding_service,
-        similarity_service=mock_similarity_service,
-        ranking_service=mock_ranking_service,
-        explanation_service=mock_explanation_service,
-        settings=settings,
+    mock_resume_analyzer.analyze.assert_called_once_with("Experienced developer")
+    mock_job_analyzer.analyze.assert_called_once()
+    mock_pipeline.run.assert_called_once_with(
+        candidate_profile=mock_candidate,
+        job_profiles=[mock_job_profile],
     )
-
-    response = await service.generate_recommendations(test_request)
-
-    assert isinstance(response, RecommendationResponse)
-    assert len(response.recommendations) == 2
-    assert response.recommendations[0].recommendation_reason is None
-
-    mock_embedding_service.embed_resume.assert_called_once_with("Experienced Python Developer")
-    mock_embedding_service.embed_jobs.assert_called_once_with(test_request.jobs)
-    mock_similarity_service.calculate_similarity.assert_called_once_with([0.1, 0.2], [[0.3, 0.4], [0.5, 0.6]])
-    mock_ranking_service.rank.assert_called_once_with(test_request.jobs, [0.8, 0.9])
-    mock_explanation_service.explain_recommendations.assert_not_called()

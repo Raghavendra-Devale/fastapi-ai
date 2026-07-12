@@ -1,7 +1,7 @@
 from fastapi import Depends
 from app.application.resume.resume_extractor_service import ResumeExtractorService
 from app.application.resume.resume_cleaner_service import ResumeCleanerService
-from app.application.resume.resume_analyzer_service import ResumeAnalyzerService
+from app.application.resume.resume_analyzer_service import ResumeAnalyzer, get_resume_analyzer
 from app.application.resume.resume_embedding_service import ResumeEmbeddingService
 from app.application.resume.resume_suggestion_service import ResumeSuggestionService
 from app.application.resume.resume_persistence_service import ResumePersistenceService
@@ -22,7 +22,7 @@ class ResumePipeline:
         self,
         extractor: ResumeExtractorService = Depends(ResumeExtractorService),
         cleaner: ResumeCleanerService = Depends(ResumeCleanerService),
-        analyzer: ResumeAnalyzerService = Depends(ResumeAnalyzerService),
+        analyzer = Depends(get_resume_analyzer),
         embedding_service: ResumeEmbeddingService = Depends(ResumeEmbeddingService),
         suggestion_service: ResumeSuggestionService = Depends(ResumeSuggestionService),
         persistence: ResumePersistenceService = Depends(ResumePersistenceService),
@@ -30,7 +30,7 @@ class ResumePipeline:
         """Initialize the pipeline with the required specialized sub-services."""
         self._extractor = extractor
         self._cleaner = cleaner
-        self._analyzer = analyzer
+        self._analyzer: ResumeAnalyzer = analyzer
         self._embedding_service = embedding_service
         self._suggestion_service = suggestion_service
         self._persistence = persistence
@@ -51,7 +51,7 @@ class ResumePipeline:
         cleaned_text = self._cleaner.clean_text(extracted_text)
 
         # 3. Analyzer
-        candidate_profile = await self._analyzer.analyze_resume(cleaned_text)
+        candidate_profile = await self._analyzer.analyze(cleaned_text)
 
         # 4. Embedding
         embedding = await self._embedding_service.generate_embedding(cleaned_text)

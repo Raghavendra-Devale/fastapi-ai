@@ -22,5 +22,6 @@ class CandidateProfile(BaseModel):
 
     # New collections
     preferred_roles: list[str] = Field(default_factory=list, description="Preferred roles or job titles.")
+    domains: list[str] = Field(default_factory=list, description="Industry domains matching candidate experience.")
     strengths: list[str] = Field(default_factory=list, description="Key candidate strengths.")
     weaknesses: list[str] = Field(default_factory=list, description="Areas for candidate improvement/weaknesses.")

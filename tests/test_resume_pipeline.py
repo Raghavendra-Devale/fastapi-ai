@@ -5,7 +5,7 @@ from app.core.exceptions import ValidationException
 from app.application.pipelines.resume_pipeline import ResumePipeline
 from app.application.resume.resume_extractor_service import ResumeExtractorService
 from app.application.resume.resume_cleaner_service import ResumeCleanerService
-from app.application.resume.resume_analyzer_service import ResumeAnalyzerService
+from app.application.resume.resume_analyzer_service import ResumeAnalyzer, MockResumeAnalyzer
 from app.application.resume.resume_embedding_service import ResumeEmbeddingService
 from app.application.resume.resume_suggestion_service import ResumeSuggestionService
 from app.application.resume.resume_persistence_service import ResumePersistenceService
@@ -41,8 +41,8 @@ def test_resume_cleaner_service():
 
 @pytest.mark.asyncio
 async def test_resume_analyzer_service():
-    service = ResumeAnalyzerService()
-    profile = await service.analyze_resume("Cleaned Text")
+    service = MockResumeAnalyzer()
+    profile = await service.analyze("Cleaned Text")
     
     assert isinstance(profile, CandidateProfile)
     assert profile.name == "John Doe"
@@ -109,8 +109,8 @@ async def test_resume_pipeline_run():
     mock_cleaner = MagicMock(spec=ResumeCleanerService)
     mock_cleaner.clean_text.return_value = "Cleaned Text"
     
-    mock_analyzer = AsyncMock(spec=ResumeAnalyzerService)
-    mock_analyzer.analyze_resume.return_value = CandidateProfile(
+    mock_analyzer = AsyncMock(spec=ResumeAnalyzer)
+    mock_analyzer.analyze.return_value = CandidateProfile(
         name="John Doe",
         summary="Summary text"
     )
@@ -145,7 +145,7 @@ async def test_resume_pipeline_run():
     
     mock_extractor.extract_text.assert_called_once_with(pdf_bytes)
     mock_cleaner.clean_text.assert_called_once_with("Extracted Raw")
-    mock_analyzer.analyze_resume.assert_called_once_with("Cleaned Text")
+    mock_analyzer.analyze.assert_called_once_with("Cleaned Text")
     mock_embedding.generate_embedding.assert_called_once_with("Cleaned Text")
     mock_suggestion.generate_suggestions.assert_called_once_with(result.candidate_profile)
     mock_persistence.save_resume_analysis.assert_called_once_with(

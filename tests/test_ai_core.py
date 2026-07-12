@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel, Field
 
-from app.core.exceptions import ValidationException
+from app.domain.ai.exceptions import AIParsingException, AIValidationException
 from app.application.ai.prompt_manager import PromptManager
 from app.application.ai.response_validator import ResponseValidator
 from app.application.ai.structured_output_service import StructuredOutputService
@@ -27,13 +27,13 @@ def test_response_validator_json():
     validator = ResponseValidator()
 
     # Empty check
-    with pytest.raises(ValidationException, match="empty or blank"):
+    with pytest.raises(AIParsingException, match="empty or blank"):
         validator.validate_json("")
-    with pytest.raises(ValidationException, match="empty or blank"):
+    with pytest.raises(AIParsingException, match="empty or blank"):
         validator.validate_json("   ")
 
     # Invalid JSON check
-    with pytest.raises(ValidationException, match="not valid JSON"):
+    with pytest.raises(AIParsingException, match="not valid JSON"):
         validator.validate_json("{invalid json}")
 
     # Valid JSON check
@@ -49,7 +49,7 @@ def test_response_validator_required_fields():
     validator.validate_required_fields(data, [])
 
     # Missing required fields
-    with pytest.raises(ValidationException, match="Missing required fields"):
+    with pytest.raises(AIValidationException, match="Missing required fields"):
         validator.validate_required_fields(data, ["name", "age"])
 
     # Match all required fields
@@ -92,10 +92,10 @@ def test_structured_output_service_parse_validation_failures():
 
     # 1. Missing required field at dict level
     raw_missing = "```json\n{\n  \"name\": \"John\"\n}\n```"
-    with pytest.raises(ValidationException, match="Missing required fields"):
+    with pytest.raises(AIValidationException, match="Missing required fields"):
         service.parse(raw_missing, MockProfile)
 
     # 2. Invalid types at Pydantic level
     raw_bad_type = "```json\n{\n  \"name\": \"John\",\n  \"age\": \"not-an-int\"\n}\n```"
-    with pytest.raises(ValidationException, match="Failed to validate data against Pydantic model"):
+    with pytest.raises(AIValidationException, match="Failed to validate data against Pydantic model"):
         service.parse(raw_bad_type, MockProfile)

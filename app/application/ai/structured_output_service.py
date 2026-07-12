@@ -2,7 +2,7 @@ import re
 from typing import Type, TypeVar
 from pydantic import BaseModel, ValidationError
 
-from app.core.exceptions import ValidationException
+from app.domain.ai.exceptions import AIValidationException
 from app.application.ai.response_validator import ResponseValidator
 
 T = TypeVar("T", bound=BaseModel)
@@ -61,7 +61,8 @@ class StructuredOutputService:
             T: Parsed Pydantic model.
 
         Raises:
-            ValidationException: If extraction, validation, or model construction fails.
+            AIParsingException: If extraction or JSON decoding fails.
+            AIValidationException: If required fields are missing or model validation fails.
         """
         # 1. Extract potential JSON content
         extracted_content = self._extract_json_block(response)
@@ -78,4 +79,4 @@ class StructuredOutputService:
         try:
             return model.model_validate(json_data)
         except ValidationError as e:
-            raise ValidationException(f"Failed to validate data against Pydantic model {model.__name__}: {str(e)}")
+            raise AIValidationException(f"Failed to validate data against Pydantic model {model.__name__}: {str(e)}")

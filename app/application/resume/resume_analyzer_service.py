@@ -3,13 +3,11 @@ from fastapi import Depends
 
 from app.core.config import Settings, get_settings
 from app.domain.resume.candidate_profile import CandidateProfile
-from app.domain.ai.providers.interfaces.llm_provider import LLMProvider
-from app.domain.ai.providers.dependencies import get_llm_provider
 from app.application.ai.prompt_manager import PromptManager
-from app.application.ai.structured_output_service import StructuredOutputService
-from app.core.logging import get_logger
+from app.application.ai.analyzers.base_analyzer import BaseAIAnalyzer
 
-logger = get_logger(__name__)
+# Re-export exceptions for cleaner interface if needed
+from app.domain.ai.exceptions import AIProviderException, AIParsingException, AIValidationException
 
 
 class ResumeAnalyzer(Protocol):
@@ -27,19 +25,11 @@ class ResumeAnalyzer(Protocol):
         ...
 
 
-class LLMResumeAnalyzer:
-    """LLM-powered implementation of the ResumeAnalyzer protocol."""
-
-    def __init__(
-        self,
-        llm_provider: LLMProvider = Depends(get_llm_provider),
-        structured_output: StructuredOutputService = Depends(StructuredOutputService),
-    ):
-        self._llm_provider = llm_provider
-        self._structured_output = structured_output
+class LLMResumeAnalyzer(BaseAIAnalyzer[CandidateProfile]):
+    """LLM-powered structured resume analyzer building on BaseAIAnalyzer."""
 
     async def analyze(self, cleaned_text: str) -> CandidateProfile:
-        """Use LLM text generation and StructuredOutputService parser to extract CandidateProfile.
+        """Parse and extract CandidateProfile from cleaned resume text using BaseAIAnalyzer.
 
         Args:
             cleaned_text (str): Cleaned, normalized resume text.
@@ -48,30 +38,19 @@ class LLMResumeAnalyzer:
             CandidateProfile: Extracted candidate profile.
 
         Raises:
-            ValidationException: If LLM call or JSON output mapping/validation fails.
+            AIProviderException: If the external LLM call fails.
+            AIParsingException: If JSON extraction fails.
+            AIValidationException: If Pydantic model validation fails.
         """
-        # Format the prompt from prompt manager template
         prompt = PromptManager.resume_analysis().format(resume_text=cleaned_text)
         system_prompt = "You are an expert resume parsing system. Return ONLY valid JSON matching the CandidateProfile schema."
 
-        try:
-            # Call the LLM provider
-            raw_response = await self._llm_provider.generate(
-                prompt=prompt,
-                system_prompt=system_prompt,
-                temperature=0.0,  # Strict extraction
-            )
-            
-            # Parse output using structured output service
-            return self._structured_output.parse(raw_response, CandidateProfile)
-        except Exception as e:
-            # Log the error and raise to prevent silent partial profiles
-            logger.error(
-                event="resume_analyzer_llm_failed",
-                error=str(e),
-                text_length=len(cleaned_text),
-            )
-            raise
+        return await self._analyze_structured(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            output_model=CandidateProfile,
+            temperature=0.0,
+        )
 
 
 class MockResumeAnalyzer:

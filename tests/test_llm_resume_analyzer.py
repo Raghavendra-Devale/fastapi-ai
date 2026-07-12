@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from app.core.exceptions import ValidationException
+from app.domain.ai.exceptions import AIProviderException, AIValidationException
 from app.domain.ai.providers.interfaces.llm_provider import LLMProvider
 from app.application.ai.structured_output_service import StructuredOutputService
 from app.application.resume.resume_analyzer_service import LLMResumeAnalyzer
@@ -49,7 +49,7 @@ async def test_llm_resume_analyzer_llm_failure():
     analyzer = LLMResumeAnalyzer(llm_provider=mock_llm, structured_output=mock_structured)
 
     # Act & Assert
-    with pytest.raises(RuntimeError, match="LLM API Timeout"):
+    with pytest.raises(AIProviderException, match="LLM provider generation call failed"):
         await analyzer.analyze("Sample resume text")
 
     mock_structured.parse.assert_not_called()
@@ -62,12 +62,13 @@ async def test_llm_resume_analyzer_validation_failure():
     mock_llm.generate.return_value = "{invalid_json}"
 
     mock_structured = MagicMock(spec=StructuredOutputService)
-    mock_structured.parse.side_effect = ValidationException("LLM response is not valid JSON")
+    mock_structured.parse.side_effect = AIValidationException("LLM response is not valid JSON")
 
     analyzer = LLMResumeAnalyzer(llm_provider=mock_llm, structured_output=mock_structured)
 
     # Act & Assert
-    with pytest.raises(ValidationException, match="LLM response is not valid JSON"):
+    with pytest.raises(AIValidationException, match="LLM response is not valid JSON"):
         await analyzer.analyze("Sample resume text")
 
     mock_structured.parse.assert_called_once_with("{invalid_json}", CandidateProfile)
+

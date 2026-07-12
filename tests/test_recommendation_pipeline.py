@@ -5,9 +5,11 @@ from app.domain.resume.candidate_profile import CandidateProfile
 from app.domain.resume.models import Skill as CandidateSkill
 from app.domain.jobs.job_profile import JobProfile
 from app.domain.recommendation.recommendation_result import RecommendationResult
-from app.domain.recommendation.services.similarity_service import SimilarityService
 from app.application.resume.resume_embedding_service import ResumeEmbeddingService
-from app.application.jobs.job_embedding_service import JobEmbeddingService
+from app.application.recommendation.semantic_score_service import SemanticScoreService
+from app.application.recommendation.skill_score_service import SkillScoreService
+from app.application.recommendation.experience_score_service import ExperienceScoreService
+from app.application.recommendation.final_score_service import FinalScoreService
 from app.application.recommendation.candidate_retrieval_service import CandidateRetrievalService
 from app.application.recommendation.ranking_service import RankingService
 from app.application.recommendation.recommendation_reason_service import RecommendationReasonService
@@ -31,21 +33,22 @@ async def test_ranking_service():
     mock_resume_embed = AsyncMock(spec=ResumeEmbeddingService)
     mock_resume_embed.generate_embedding.return_value = [0.1, 0.2]
 
-    mock_job_embed = AsyncMock(spec=JobEmbeddingService)
-    mock_job_embed.generate_embedding.return_value = [0.3, 0.4]
-
-    mock_similarity = MagicMock(spec=SimilarityService)
-    mock_similarity.calculate_similarity.return_value = [0.85, 0.95]
+    # Mock Semantic Score Service
+    mock_semantic = AsyncMock(spec=SemanticScoreService)
+    mock_semantic.calculate_score.side_effect = [0.80, 0.90]
 
     service = RankingService(
         resume_embedding_service=mock_resume_embed,
-        job_embedding_service=mock_job_embed,
-        similarity_service=mock_similarity,
+        semantic_service=mock_semantic,
+        skill_service=SkillScoreService(),
+        experience_service=ExperienceScoreService(),
+        final_service=FinalScoreService(),
     )
 
     candidate = CandidateProfile(
         name="John",
         skills=[CandidateSkill(name="Python", confidence=1.0), CandidateSkill(name="FastAPI", confidence=0.9)],
+        experience_years=3.0,
     )
     jobs = [
         JobProfile(
@@ -54,6 +57,7 @@ async def test_ranking_service():
             company="C1",
             required_skills=["Python", "Go"],
             preferred_skills=["Docker"],
+            experience="3+ years",
         ),
         JobProfile(
             id="job2",
@@ -61,27 +65,39 @@ async def test_ranking_service():
             company="C2",
             required_skills=["FastAPI"],
             preferred_skills=["Python"],
+            experience="5 years",
         ),
     ]
 
     results = await service.rank_jobs(candidate, jobs)
     
-    # Assert ordering (similarity calculations returned 0.85 and 0.95 respectively, so job2 must be first)
+    # Assert ordering and scores
+    # Job 1 has:
+    #   Semantic = 0.80
+    #   Skill = 1/2 req + 0 pref = 0.5
+    #   Exp = 3/3 = 1.0
+    #   Final = 0.80*0.5 + 0.5*0.3 + 1.0*0.2 = 0.4 + 0.15 + 0.2 = 0.75
+    # Job 2 has:
+    #   Semantic = 0.90
+    #   Skill = 1/1 req + 1/1 pref = 1.0 (both matched)
+    #   Exp = 3/5 = 0.6
+    #   Final = 0.90*0.5 + 1.0*0.3 + 0.6*0.2 = 0.45 + 0.3 + 0.12 = 0.87
+    # Thus, Job 2 (final score 0.87) is ranked first over Job 1 (final score 0.75)
     assert len(results) == 2
     assert results[0].job_profile.id == "job2"
-    assert results[0].similarity_score == 0.95
-    assert "FastAPI" in results[0].matched_skills
-    assert "Python" in results[0].matched_skills
-    assert results[0].missing_skills == []
+    assert results[0].final_score == pytest.approx(0.87)
+    assert results[0].semantic_score == 0.90
+    assert results[0].skill_score == 1.0
+    assert results[0].experience_score == pytest.approx(0.6)
 
     assert results[1].job_profile.id == "job1"
-    assert results[1].similarity_score == 0.85
-    assert "Python" in results[1].matched_skills
-    assert "Go" in results[1].missing_skills
+    assert results[1].final_score == pytest.approx(0.75)
+    assert results[1].semantic_score == 0.80
+    assert results[1].skill_score == 0.5
+    assert results[1].experience_score == 1.0
 
     mock_resume_embed.generate_embedding.assert_called_once()
-    assert mock_job_embed.generate_embedding.call_count == 2
-    mock_similarity.calculate_similarity.assert_called_once()
+    assert mock_semantic.calculate_score.call_count == 2
 
 
 def test_recommendation_reason_service():
@@ -91,7 +107,11 @@ def test_recommendation_reason_service():
     # 1. High Score
     res_high = RecommendationResult(
         job_profile=profile,
-        similarity_score=0.85,
+        semantic_score=0.85,
+        skill_score=0.85,
+        experience_score=0.85,
+        location_score=1.0,
+        education_score=1.0,
         final_score=0.85,
         matched_skills=["Python"],
     )
@@ -102,7 +122,11 @@ def test_recommendation_reason_service():
     # 2. Medium Score
     res_med = RecommendationResult(
         job_profile=profile,
-        similarity_score=0.60,
+        semantic_score=0.60,
+        skill_score=0.60,
+        experience_score=0.60,
+        location_score=1.0,
+        education_score=1.0,
         final_score=0.60,
         matched_skills=[],
         missing_skills=["Kubernetes"],
@@ -118,7 +142,11 @@ async def test_recommendation_persistence_service():
     profile = JobProfile(id="1", title="Developer", company="DevCorp")
     res = RecommendationResult(
         job_profile=profile,
-        similarity_score=0.9,
+        semantic_score=0.9,
+        skill_score=0.9,
+        experience_score=0.9,
+        location_score=1.0,
+        education_score=1.0,
         final_score=0.9,
     )
     success = await service.save_recommendations([res])
@@ -134,7 +162,11 @@ async def test_recommendation_pipeline_run():
     mock_ranking.rank_jobs.return_value = [
         RecommendationResult(
             job_profile=JobProfile(id="1", title="Job 1", company="C1"),
-            similarity_score=0.9,
+            semantic_score=0.9,
+            skill_score=0.9,
+            experience_score=0.9,
+            location_score=1.0,
+            education_score=1.0,
             final_score=0.9,
         )
     ]
@@ -163,3 +195,4 @@ async def test_recommendation_pipeline_run():
     mock_ranking.rank_jobs.assert_called_once_with(candidate, mock_retrieval.retrieve_jobs.return_value)
     mock_reason.generate_reason.assert_called_once()
     mock_persistence.save_recommendations.assert_called_once_with(results)
+

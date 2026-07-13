@@ -35,11 +35,18 @@ class ResumePipeline:
         self._suggestion_service = suggestion_service
         self._persistence = persistence
 
-    async def run(self, pdf_bytes: bytes) -> ResumeAnalysisResult:
+    async def run(
+        self,
+        pdf_bytes: bytes,
+        resume_id: int | None = None,
+        user_id: int | None = None,
+    ) -> ResumeAnalysisResult:
         """Run the complete resume processing, extraction, clean, analyze, embed, and suggestion flow.
 
         Args:
             pdf_bytes (bytes): Raw bytes of the resume PDF.
+            resume_id (int | None): Spring Boot database resume entity ID.
+            user_id (int | None): Spring Boot database user entity ID.
 
         Returns:
             ResumeAnalysisResult: Contains candidate_profile, embedding, and suggestions.
@@ -60,10 +67,13 @@ class ResumePipeline:
         suggestions = await self._suggestion_service.generate_suggestions(candidate_profile)
 
         # 6. Persistence
+        logger.info(f"ResumePipeline: calling save_resume_analysis with resume_id={resume_id}, user_id={user_id}")
         await self._persistence.save_resume_analysis(
             candidate_profile=candidate_profile,
             embedding=embedding,
             suggestions=suggestions,
+            resume_id=resume_id,
+            user_id=user_id,
         )
 
         return ResumeAnalysisResult(

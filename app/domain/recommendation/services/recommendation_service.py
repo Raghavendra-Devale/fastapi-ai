@@ -1,11 +1,13 @@
-from fastapi import Depends
+from fastapi import Depends, HTTPException
 
 from app.domain.recommendation.models.recommendation_request import RecommendationRequest
 from app.domain.recommendation.models.recommendation_response import RecommendationResponse, RecommendationItem
-from app.domain.jobs.models.raw_job import RawJob
-from app.application.resume.resume_analyzer_service import ResumeAnalyzer, get_resume_analyzer
-from app.application.jobs.job_analyzer_service import JobAnalyzer, get_job_analyzer
+from app.domain.resume.candidate_profile import CandidateProfile
 from app.application.pipelines.recommendation_pipeline import RecommendationPipeline
+from app.infrastructure.repositories.candidate_profile_repository import CandidateProfileRepository
+from app.core.logging import get_logger
+
+logger = get_logger("recommendation_service")
 
 
 class RecommendationService:
@@ -13,51 +15,55 @@ class RecommendationService:
 
     def __init__(
         self,
-        resume_analyzer = Depends(get_resume_analyzer),
-        job_analyzer = Depends(get_job_analyzer),
+        candidate_repository: CandidateProfileRepository = Depends(CandidateProfileRepository),
         recommendation_pipeline: RecommendationPipeline = Depends(RecommendationPipeline),
     ):
-        """Initialize the orchestration service with the new pipeline dependencies."""
-        self._resume_analyzer: ResumeAnalyzer = resume_analyzer
-        self._job_analyzer: JobAnalyzer = job_analyzer
+        """Initialize the orchestration service with the pipeline and database repository."""
+        self._candidate_repository = candidate_repository
         self._recommendation_pipeline = recommendation_pipeline
 
     async def generate_recommendations(
         self,
         request: RecommendationRequest,
     ) -> RecommendationResponse:
-        """Coordinate embedding, similarity scoring, ranking, and explanation pipelines to
-         generate job recommendations.
+        """Load candidate profile from DB, perform matching against all job profiles, and return recommendations.
 
         Args:
-            request (RecommendationRequest): Normalized resume text and job documents.
+            request (RecommendationRequest): Contains candidate_profile_id.
 
         Returns:
             RecommendationResponse: Ranked list of recommendation items.
         """
-        # 1. Analyze resume text to produce CandidateProfile
-        candidate_profile = await self._resume_analyzer.analyze(request.resume_text)
-
-        # 2. Analyze job documents to produce JobProfiles
-        job_profiles = []
-        for jd in request.jobs:
-            raw_job = RawJob(
-                title=jd.title,
-                company=jd.company,
-                location=jd.location,
-                description=jd.description,
-                apply_url=jd.apply_url,
-                employment_type=jd.employment_type,
+        # 1. Load CandidateProfileModel from database
+        candidate_model = self._candidate_repository.find_by_id(request.candidate_profile_id)
+        if not candidate_model:
+            logger.warning(
+                event="candidate_profile_not_found",
+                candidate_profile_id=request.candidate_profile_id,
             )
-            job_profile = await self._job_analyzer.analyze(raw_job)
-            # Map apply_url to JobProfile (it may not exist in LLM output)
-            job_profile.apply_url = jd.apply_url
-            job_profiles.append(job_profile)
+            raise HTTPException(
+                status_code=404,
+                detail=f"Candidate profile with ID {request.candidate_profile_id} not found."
+            )
 
-        # 3. Execute the recommendation pipeline
+        # 2. Map model to CandidateProfile domain model
+        try:
+            candidate_profile = CandidateProfile.model_validate(candidate_model.profile_json)
+            # Make sure ID matches database primary key UUID
+            candidate_profile.id = str(candidate_model.id)
+        except Exception as exc:
+            logger.exception(
+                "Failed to deserialize candidate profile JSON",
+                candidate_profile_id=request.candidate_profile_id,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Stored candidate profile json is malformed or incompatible."
+            )
+
+        # 3. Execute the recommendation pipeline (loads jobs from DB dynamically)
         results = await self._recommendation_pipeline.run(
             candidate_profile=candidate_profile,
-            job_profiles=job_profiles,
         )
 
         # 4. Map to RecommendationResponse items

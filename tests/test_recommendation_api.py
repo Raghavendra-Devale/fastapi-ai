@@ -34,17 +34,7 @@ def test_generate_recommendations_success(mock_recommendation_service):
     app.dependency_overrides[RecommendationService] = lambda: mock_recommendation_service
 
     payload = {
-        "resume_text": "Experienced Python Developer.",
-        "jobs": [
-            {
-                "title": "Software Engineer",
-                "company": "Acme Corp",
-                "location": "Remote",
-                "description": "Coding in Python",
-                "employment_type": "Full-time",
-                "apply_url": "https://acme.corp/apply",
-            }
-        ],
+        "candidate_profile_id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
     }
 
     with TestClient(app) as client:
@@ -60,47 +50,17 @@ def test_generate_recommendations_success(mock_recommendation_service):
 
 
 def test_generate_recommendations_invalid_request_schema(mock_recommendation_service):
-    """Test that schema validation fails (422) for bad payload format (e.g. missing resume_text)."""
+    """Test that schema validation fails (422) for bad payload format (missing candidate_profile_id)."""
     app.dependency_overrides[RecommendationService] = lambda: mock_recommendation_service
 
-    # Missing resume_text
-    payload = {
-        "jobs": [
-            {
-                "title": "Software Engineer",
-                "company": "Acme Corp",
-                "description": "Coding in Python",
-                "apply_url": "https://acme.corp/apply",
-            }
-        ],
-    }
+    payload = {}
 
     with TestClient(app) as client:
         response = client.post("/api/v1/recommendations/generate", json=payload)
         assert response.status_code == 422
         data = response.json()
         assert data["success"] is False
-        assert "resume_text" in data["error"]["message"]
-
-    app.dependency_overrides.clear()
-
-
-def test_generate_recommendations_empty_jobs_list(mock_recommendation_service):
-    """Test that empty jobs list returns a 400 validation error."""
-    app.dependency_overrides[RecommendationService] = lambda: mock_recommendation_service
-
-    # Empty jobs list
-    payload = {
-        "resume_text": "Experienced Python Developer.",
-        "jobs": [],
-    }
-
-    with TestClient(app) as client:
-        response = client.post("/api/v1/recommendations/generate", json=payload)
-        assert response.status_code == 400
-        data = response.json()
-        assert data["success"] is False
-        assert "empty" in data["error"]["message"].lower()
+        assert "candidate_profile_id" in data["error"]["message"]
 
     app.dependency_overrides.clear()
 
@@ -114,17 +74,7 @@ def test_generate_recommendations_service_exception(mock_recommendation_service)
     app.dependency_overrides[RecommendationService] = lambda: mock_recommendation_service
 
     payload = {
-        "resume_text": "Experienced Python Developer.",
-        "jobs": [
-            {
-                "title": "Software Engineer",
-                "company": "Acme Corp",
-                "location": "Remote",
-                "description": "Coding in Python",
-                "employment_type": "Full-time",
-                "apply_url": "https://acme.corp/apply",
-            }
-        ],
+        "candidate_profile_id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
     }
 
     with TestClient(app) as client:

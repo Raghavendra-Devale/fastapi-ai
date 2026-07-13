@@ -27,21 +27,17 @@ class RecommendationPipeline:
     async def run(
         self,
         candidate_profile: CandidateProfile,
-        job_profiles: list[JobProfile] = None,
     ) -> list[RecommendationResult]:
         """Run the recommendation pipeline.
 
         Args:
             candidate_profile (CandidateProfile): Candidate profile.
-            job_profiles (list[JobProfile], optional): Custom list of job profiles to rank.
-                If not provided, retrievals will be run to fetch jobs automatically.
 
         Returns:
             list[RecommendationResult]: Ranked recommendations list.
         """
-        # 1. Retrieve Jobs (if not provided explicitly)
-        if job_profiles is None:
-            job_profiles = await self._retrieval.retrieve_jobs(candidate_profile)
+        # 1. Retrieve Jobs
+        job_profiles = await self._retrieval.retrieve_jobs(candidate_profile)
 
         # 2. Ranking
         ranked_recommendations = await self._ranking.rank_jobs(candidate_profile, job_profiles)

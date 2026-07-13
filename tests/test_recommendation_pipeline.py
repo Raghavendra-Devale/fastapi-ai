@@ -15,11 +15,33 @@ from app.application.recommendation.ranking_service import RankingService
 from app.application.recommendation.recommendation_reason_service import RecommendationReasonService
 from app.application.recommendation.recommendation_persistence_service import RecommendationPersistenceService
 from app.application.pipelines.recommendation_pipeline import RecommendationPipeline
+from app.application.jobs.job_profile_retrieval_service import JobProfileRetrievalService
 
 
 @pytest.mark.asyncio
 async def test_candidate_retrieval_service():
-    service = CandidateRetrievalService()
+    mock_retrieval = MagicMock(spec=JobProfileRetrievalService)
+    mock_retrieval.find_active.return_value = [
+        JobProfile(
+            id="mock-job-1",
+            title="Python Developer",
+            company="PyCorp",
+            summary="Write python application code.",
+            required_skills=["Python", "FastAPI"],
+            preferred_skills=["Docker"],
+            location="San Francisco, CA",
+        ),
+        JobProfile(
+            id="mock-job-2",
+            title="React Frontend Developer",
+            company="UI-Design",
+            summary="Build user interfaces in React.",
+            required_skills=["React", "JavaScript"],
+            preferred_skills=["TypeScript"],
+            location="Remote",
+        ),
+    ]
+    service = CandidateRetrievalService(retrieval_service=mock_retrieval)
     candidate = CandidateProfile(name="John")
     jobs = await service.retrieve_jobs(candidate)
     

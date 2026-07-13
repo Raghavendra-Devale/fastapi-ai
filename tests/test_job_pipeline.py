@@ -121,4 +121,6 @@ async def test_job_pipeline_run():
     mock_persistence.save_job_analysis.assert_called_once_with(
         job_profile=result.job_profile,
         embedding=result.embedding,
+        job_id=None,
+        provider=None,
     )

@@ -17,5 +17,7 @@ class JobDocument(BaseModel):
 class RecommendationRequest(BaseModel):
     """Represents the request payload sent by Spring Boot to get job recommendations."""
 
-    resume_text: str = Field(..., description="The normalized text content of the candidate's resume.")
-    jobs: list[JobDocument] = Field(..., description="The list of normalized jobs to run recommendations against.")
+    candidate_profile_id: str = Field(
+        ...,
+        description="The UUID identifying the stored candidate profile in the AI schema.",
+    )

@@ -16,22 +16,21 @@ router = APIRouter()
     response_model=RecommendationResponse,
     status_code=200,
     summary="Generate Job Recommendations",
-    description="Analyze resume text and match it against a list of job documents to produce ranked recommendations.",
+    description="Match a stored candidate profile against all active stored job profiles.",
 )
 async def generate_recommendations(
     request: RecommendationRequest,
     recommendation_service: RecommendationService = Depends(),
 ) -> RecommendationResponse:
-    """Endpoint to generate job recommendations based on resume and jobs list.
+    """Endpoint to generate job recommendations based on candidate_profile_id.
 
-    Validates that the jobs list is not empty, invokes RecommendationService,
-    and returns ranked RecommendationResponse. Maps downstream domain errors
-    to correct REST responses.
+    Invokes RecommendationService and returns ranked RecommendationResponse.
+    Maps downstream domain errors to correct REST responses.
     """
-    if not request.jobs:
+    if not request.candidate_profile_id or not request.candidate_profile_id.strip():
         raise HTTPException(
             status_code=400,
-            detail="Job list cannot be empty.",
+            detail="candidate_profile_id cannot be blank.",
         )
 
     try:
@@ -47,6 +46,8 @@ async def generate_recommendations(
             status_code=500,
             detail=f"Unexpected AI engine failure: {str(exc)}",
         ) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Unexpected error in generate_recommendations")
         raise HTTPException(

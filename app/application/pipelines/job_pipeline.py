@@ -23,11 +23,16 @@ class JobPipeline:
         self._embedding_service = embedding_service
         self._persistence = persistence
 
-    async def run(self, raw_job: RawJob) -> JobAnalysisResult:
+    async def run(
+        self,
+        raw_job: RawJob,
+        job_id: int | None = None,
+    ) -> JobAnalysisResult:
         """Run the job pipeline.
 
         Args:
             raw_job (RawJob): Raw scraped job posting.
+            job_id (int | None): Spring Boot database job entity ID.
 
         Returns:
             JobAnalysisResult: Standardized job profile, embedding vector, and normalized text.
@@ -45,6 +50,8 @@ class JobPipeline:
         await self._persistence.save_job_analysis(
             job_profile=job_profile,
             embedding=embedding,
+            job_id=job_id,
+            provider=raw_job.source,
         )
 
         return JobAnalysisResult(

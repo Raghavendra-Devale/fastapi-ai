@@ -34,6 +34,30 @@ async def lifespan(app: FastAPI):
         llm_model=settings.llm_model,
     )
 
+    # 1. Initialize PostgreSQL schemas and tables in the target "ai" schema
+    try:
+        from sqlalchemy import text
+        from app.core.database import engine
+        import os
+
+        logger.info(event="database_schema_initialization_started")
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        sql_path = os.path.join(current_dir, "core", "init_ai_schema.sql")
+        
+        with open(sql_path, "r", encoding="utf-8") as f:
+            sql_script = f.read()
+
+        with engine.begin() as conn:
+            conn.execute(text(sql_script))
+        
+        logger.info(event="database_schema_initialization_completed")
+    except Exception as exc:
+        logger.error(
+            event="database_schema_initialization_failed",
+            message=f"Failed to initialize database tables: {str(exc)}",
+        )
+        raise exc
+
     # Perform startup connection health validation on the configured provider
     try:
         # Instantiate providers for startup check

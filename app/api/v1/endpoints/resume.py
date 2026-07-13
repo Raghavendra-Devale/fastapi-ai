@@ -1,5 +1,5 @@
 import time
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile, Form
 
 from app.application.pipelines.resume_pipeline import ResumePipeline
 from app.core.config import Settings, get_settings
@@ -22,7 +22,13 @@ class ResumeController:
         """Initialize ResumeController with dependencies."""
         self._resume_pipeline = resume_pipeline
 
-    async def process_resume(self, file: UploadFile, settings: Settings) -> ResumeIntelligenceSchema:
+    async def process_resume(
+        self,
+        file: UploadFile,
+        settings: Settings,
+        resume_id: int | None = None,
+        user_id: int | None = None,
+    ) -> ResumeIntelligenceSchema:
         """Validate, parse, and process the uploaded PDF file to extract ResumeIntelligence."""
         # 1. Accept PDF only by extension
         if not file.filename or not file.filename.lower().endswith(".pdf"):
@@ -53,7 +59,8 @@ class ResumeController:
         start_time = time.perf_counter()
         try:
             # 5. Call ResumePipeline
-            result = await self._resume_pipeline.run(pdf_bytes)
+            logger.info(f"ResumeController: calling pipeline.run with resume_id={resume_id}, user_id={user_id}")
+            result = await self._resume_pipeline.run(pdf_bytes, resume_id, user_id)
 
             # 6. Extract CandidateProfile and map to business schema
             profile = result.candidate_profile
@@ -106,8 +113,10 @@ class ResumeController:
 )
 async def process_resume(
     file: UploadFile = File(..., description="The resume PDF file to process."),
+    resumeId: int | None = Form(None, description="The Spring Boot resume database ID."),
+    userId: int | None = Form(None, description="The Spring Boot user database ID."),
     settings: Settings = Depends(get_settings),
     controller: ResumeController = Depends(),
 ) -> ResumeIntelligenceSchema:
     """Expose the AI capability through the public business endpoint."""
-    return await controller.process_resume(file, settings)
+    return await controller.process_resume(file, settings, resume_id=resumeId, user_id=userId)

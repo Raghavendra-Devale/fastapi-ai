@@ -81,4 +81,47 @@ def get_settings() -> Settings:
 
     Returns the cached Settings instance using a process-wide lru_cache.
     """
-    return Settings()
+    import sys
+    sys.stderr.write("[WSL_AUTO_DETECT] get_settings() called\n")
+    sys.stderr.flush()
+    
+    settings = Settings()
+
+    # Auto-detect WSL if Ollama is configured on localhost/127.0.0.1 on Windows host
+    if "localhost" in settings.ollama_base_url or "127.0.0.1" in settings.ollama_base_url:
+        import subprocess
+        is_inside_wsl = False
+        try:
+            with open("/proc/version", "r") as f:
+                if "microsoft" in f.read().lower():
+                    is_inside_wsl = True
+        except Exception:
+            pass
+
+        if not is_inside_wsl:
+            try:
+                sys.stderr.write("[WSL_AUTO_DETECT] Attempting to auto-detect WSL IP for Ollama...\n")
+                sys.stderr.flush()
+                # Query WSL instance IP addresses
+                result = subprocess.run(
+                    ["wsl", "hostname", "-I"],
+                    capture_output=True,
+                    text=True,
+                    timeout=3.0,
+                )
+                if result.returncode == 0:
+                    ips = result.stdout.strip().split()
+                    if ips:
+                        wsl_ip = ips[0]
+                        original = settings.ollama_base_url
+                        settings.ollama_base_url = original.replace("localhost", wsl_ip).replace("127.0.0.1", wsl_ip)
+                        sys.stderr.write(f"[WSL_AUTO_DETECT] Swapped Ollama base URL from {original} to {settings.ollama_base_url}\n")
+                        sys.stderr.flush()
+                else:
+                    sys.stderr.write(f"[WSL_AUTO_DETECT] wsl command returned non-zero code: {result.returncode}\n")
+                    sys.stderr.flush()
+            except Exception as e:
+                sys.stderr.write(f"[WSL_AUTO_DETECT] Failed to execute wsl command: {e}\n")
+                sys.stderr.flush()
+
+    return settings

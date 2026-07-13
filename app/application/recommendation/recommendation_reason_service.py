@@ -29,11 +29,21 @@ class RecommendationReasonService:
             RecommendationResult: Enriched recommendation.
         """
         # Call the reasoning analyzer to extract bullet points
-        reason_data = await self._reason_analyzer.analyze(
-            result=result,
-            candidate_profile=candidate_profile,
-            job_profile=result.job_profile,
-        )
+        try:
+            reason_data = await self._reason_analyzer.analyze(
+                result=result,
+                candidate_profile=candidate_profile,
+                job_profile=result.job_profile,
+            )
+        except Exception as exc:
+            # Fall back to MockReasonAnalyzer if LLM provider fails (e.g. Ollama offline)
+            from app.application.recommendation.recommendation_reason_generator import MockReasonAnalyzer
+            mock_analyzer = MockReasonAnalyzer()
+            reason_data = await mock_analyzer.analyze(
+                result=result,
+                candidate_profile=candidate_profile,
+                job_profile=result.job_profile,
+            )
 
         # Format list of bullet points as structured text block
         formatted_bullets = "\n".join(f"• {bp}" for bp in reason_data.bullet_points)

@@ -25,10 +25,10 @@ class SimilarityService:
         Raises:
             ValidationException: If inputs are empty, contain zero vectors, or have mismatched dimensions.
         """
-        if not resume_embedding:
+        if resume_embedding is None or len(resume_embedding) == 0:
             raise ValidationException("Resume embedding cannot be empty.")
 
-        if not job_embeddings:
+        if job_embeddings is None or len(job_embeddings) == 0:
             raise ValidationException("Job embeddings list cannot be empty.")
 
         expected_dim = len(resume_embedding)
@@ -41,7 +41,7 @@ class SimilarityService:
 
         scores = []
         for idx, job_emb in enumerate(job_embeddings):
-            if not job_emb:
+            if job_emb is None or len(job_emb) == 0:
                 raise ValidationException(f"Job embedding at index {idx} cannot be empty.")
 
             if len(job_emb) != expected_dim:

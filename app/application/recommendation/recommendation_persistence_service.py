@@ -28,7 +28,7 @@ class RecommendationPersistenceService:
                 event="persisting_recommendation",
                 rank=idx + 1,
                 job_id=rec.job_profile.id,
-                similarity_score=rec.similarity_score,
+                similarity_score=rec.semantic_score,
                 final_score=rec.final_score,
             )
         return True

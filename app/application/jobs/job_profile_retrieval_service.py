@@ -72,4 +72,5 @@ class JobProfileRetrievalService:
         profile.company = model.company
         profile.location = model.location
         profile.experience = model.experience
+        profile.embedding = model.embedding
         return profile

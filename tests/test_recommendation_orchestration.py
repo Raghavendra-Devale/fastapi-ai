@@ -4,31 +4,26 @@ from unittest.mock import AsyncMock, MagicMock
 from app.domain.recommendation.models.recommendation_request import RecommendationRequest
 from app.domain.recommendation.models.recommendation_response import RecommendationResponse
 from app.domain.jobs.job_profile import JobProfile
-from app.core.models import CandidateProfileModel
+from app.domain.resume.candidate_profile import CandidateProfile
 from app.domain.recommendation.recommendation_result import RecommendationResult
 from app.application.pipelines.recommendation_pipeline import RecommendationPipeline
 from app.domain.recommendation.services.recommendation_service import RecommendationService
-from app.infrastructure.repositories.candidate_profile_repository import CandidateProfileRepository
+from app.application.resume.candidate_profile_retrieval_service import CandidateProfileRetrievalService
 
 
 @pytest.mark.asyncio
 async def test_recommendation_orchestration_new_pipeline():
     # Arrange
-    mock_candidate_repo = MagicMock(spec=CandidateProfileRepository)
-    # Return a dummy CandidateProfileModel when searched
-    mock_candidate_model = CandidateProfileModel(
-        id="a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-        resume_id=1,
-        user_id=1,
-        profile_json={
-            "name": "Alice",
-            "headline": "Software Engineer",
-            "experience_years": 5.0,
-            "skills": [{"name": "Python", "confidence": 1.0}],
-            "preferred_roles": ["Developer"],
-        },
+    mock_retrieval_service = MagicMock(spec=CandidateProfileRetrievalService)
+    
+    mock_candidate_profile = CandidateProfile(
+        name="Alice",
+        headline="Software Engineer",
+        experience_years=5.0,
+        skills=[],
+        preferred_roles=["Developer"],
     )
-    mock_candidate_repo.find_by_id.return_value = mock_candidate_model
+    mock_retrieval_service.get_candidate_profile.return_value = mock_candidate_profile
 
     mock_job_profile = JobProfile(title="Developer", company="TechCorp")
     mock_pipeline = AsyncMock(spec=RecommendationPipeline)
@@ -47,7 +42,7 @@ async def test_recommendation_orchestration_new_pipeline():
     mock_pipeline.run.return_value = [mock_result]
 
     service = RecommendationService(
-        candidate_repository=mock_candidate_repo,
+        candidate_retrieval_service=mock_retrieval_service,
         recommendation_pipeline=mock_pipeline,
     )
 
@@ -67,5 +62,5 @@ async def test_recommendation_orchestration_new_pipeline():
     assert item.similarity_score == 0.85  # Maps to final_score
     assert item.recommendation_reason == "Strong Python matches"
 
-    mock_candidate_repo.find_by_id.assert_called_once_with("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")
+    mock_retrieval_service.get_candidate_profile.assert_called_once_with("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")
     mock_pipeline.run.assert_called_once()

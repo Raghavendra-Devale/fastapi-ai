@@ -5,6 +5,7 @@ from app.domain.resume.models import Skill, Education, Experience, Project, Cert
 class CandidateProfile(BaseModel):
     """Canonical Candidate Profile model representing the structured AI extraction results."""
 
+    id: str | None = Field(None, description="The unique identifier of the candidate profile.")
     name: str | None = Field(None, description="The full name of the candidate.")
     headline: str | None = Field(None, description="A professional headline or job title.")
     summary: str | None = Field(None, description="A short professional summary.")
@@ -25,3 +26,6 @@ class CandidateProfile(BaseModel):
     domains: list[str] = Field(default_factory=list, description="Industry domains matching candidate experience.")
     strengths: list[str] = Field(default_factory=list, description="Key candidate strengths.")
     weaknesses: list[str] = Field(default_factory=list, description="Areas for candidate improvement/weaknesses.")
+    
+    # Precalculated vector embedding from DB
+    embedding: list[float] | None = Field(None, description="The vector embedding representation of the candidate profile.")

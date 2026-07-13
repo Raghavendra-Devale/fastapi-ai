@@ -35,17 +35,21 @@ class SemanticScoreService:
         Returns:
             float: Semantic score (0.0 to 1.0).
         """
-        # 1. Generate candidate embedding if not precomputed
+        # 1. Generate candidate embedding if not precomputed and not in profile
         if candidate_embedding is None:
-            candidate_text = (
-                f"Headline: {candidate_profile.headline or ''}\n"
-                f"Summary: {candidate_profile.summary or ''}\n"
-                f"Skills: {', '.join(s.name for s in candidate_profile.skills)}"
-            )
-            candidate_embedding = await self._resume_embedding_service.generate_embedding(candidate_text)
+            candidate_embedding = getattr(candidate_profile, "embedding", None)
+            if candidate_embedding is None:
+                candidate_text = (
+                    f"Headline: {candidate_profile.headline or ''}\n"
+                    f"Summary: {candidate_profile.summary or ''}\n"
+                    f"Skills: {', '.join(s.name for s in candidate_profile.skills)}"
+                )
+                candidate_embedding = await self._resume_embedding_service.generate_embedding(candidate_text)
 
-        # 2. Generate embedding for JobProfile
-        job_emb = await self._job_embedding_service.generate_embedding(job_profile)
+        # 2. Retrieve embedding for JobProfile or generate it if missing
+        job_emb = getattr(job_profile, "embedding", None)
+        if job_emb is None:
+            job_emb = await self._job_embedding_service.generate_embedding(job_profile)
 
         # 3. Calculate similarity using domain similarity service
         scores = self._similarity_service.calculate_similarity(candidate_embedding, [job_emb])

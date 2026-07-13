@@ -22,6 +22,7 @@ class JobProfile(BaseModel):
     location: str | None = Field(None, description="Job location.")
     salary: str | None = Field(None, description="Standardized or raw salary information.")
     industry: str | None = Field(None, description="The industry field of the job/company.")
+    apply_url: str | None = Field(None, description="The link to apply for the job.")
     
     # Collections
     responsibilities: list[str] = Field(default_factory=list, description="List of job responsibilities and duties.")
@@ -32,3 +33,6 @@ class JobProfile(BaseModel):
     
     # AI Metadata
     confidence: float = Field(1.0, description="Overall AI parsing/extraction confidence score (0.0 to 1.0).")
+    
+    # Precalculated vector embedding from DB
+    embedding: list[float] | None = Field(None, description="The vector embedding representation of the job profile.")

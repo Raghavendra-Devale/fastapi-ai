@@ -69,6 +69,9 @@ class LLMJobAnalyzer(BaseAIAnalyzer[JobProfile]):
         if not profile.salary and raw_job.salary:
             profile.salary = raw_job.salary
 
+        # Map apply_url directly from raw metadata
+        profile.apply_url = raw_job.apply_url
+
         return profile
 
 
@@ -90,6 +93,7 @@ class MockJobAnalyzer:
             location=raw_job.location or "San Francisco, CA",
             salary=raw_job.salary or "$120,000 - $150,000",
             industry="Software",
+            apply_url=raw_job.apply_url or "https://mockjob.com/apply",
             responsibilities=["Develop backend APIs", "Write tests"],
             requirements=["Solid Python knowledge", "API design experience"],
             benefits=["Health insurance", "Unlimited PTO"],

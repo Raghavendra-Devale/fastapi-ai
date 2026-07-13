@@ -17,10 +17,13 @@ from app.application.recommendation.recommendation_persistence_service import Re
 from app.application.pipelines.recommendation_pipeline import RecommendationPipeline
 from app.application.jobs.job_profile_retrieval_service import JobProfileRetrievalService
 
+from app.application.jobs.vector_retrieval_service import VectorRetrievalService
+
 
 @pytest.mark.asyncio
-async def test_candidate_retrieval_service():
+async def test_candidate_retrieval_service_fallback():
     mock_retrieval = MagicMock(spec=JobProfileRetrievalService)
+    mock_vector = MagicMock(spec=VectorRetrievalService)
     mock_retrieval.find_active.return_value = [
         JobProfile(
             id="mock-job-1",
@@ -30,7 +33,26 @@ async def test_candidate_retrieval_service():
             required_skills=["Python", "FastAPI"],
             preferred_skills=["Docker"],
             location="San Francisco, CA",
-        ),
+        )
+    ]
+    service = CandidateRetrievalService(
+        vector_service=mock_vector,
+        retrieval_service=mock_retrieval,
+    )
+    candidate = CandidateProfile(name="John")  # No embedding
+    jobs = await service.retrieve_jobs(candidate)
+    
+    assert len(jobs) == 1
+    assert jobs[0].title == "Python Developer"
+    mock_retrieval.find_active.assert_called_once()
+    mock_vector.find_similar_jobs.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_candidate_retrieval_service_vector():
+    mock_retrieval = MagicMock(spec=JobProfileRetrievalService)
+    mock_vector = AsyncMock(spec=VectorRetrievalService)
+    mock_vector.find_similar_jobs.return_value = [
         JobProfile(
             id="mock-job-2",
             title="React Frontend Developer",
@@ -39,15 +61,19 @@ async def test_candidate_retrieval_service():
             required_skills=["React", "JavaScript"],
             preferred_skills=["TypeScript"],
             location="Remote",
-        ),
+        )
     ]
-    service = CandidateRetrievalService(retrieval_service=mock_retrieval)
-    candidate = CandidateProfile(name="John")
+    service = CandidateRetrievalService(
+        vector_service=mock_vector,
+        retrieval_service=mock_retrieval,
+    )
+    candidate = CandidateProfile(name="John", embedding=[0.1] * 384)
     jobs = await service.retrieve_jobs(candidate)
     
-    assert len(jobs) == 2
-    assert jobs[0].title == "Python Developer"
-    assert jobs[1].title == "React Frontend Developer"
+    assert len(jobs) == 1
+    assert jobs[0].title == "React Frontend Developer"
+    mock_vector.find_similar_jobs.assert_called_once_with(embedding=candidate.embedding, limit=200)
+    mock_retrieval.find_active.assert_not_called()
 
 
 @pytest.mark.asyncio

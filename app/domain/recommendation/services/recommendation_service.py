@@ -4,7 +4,7 @@ from app.domain.recommendation.models.recommendation_request import Recommendati
 from app.domain.recommendation.models.recommendation_response import RecommendationResponse, RecommendationItem
 from app.domain.resume.candidate_profile import CandidateProfile
 from app.application.pipelines.recommendation_pipeline import RecommendationPipeline
-from app.infrastructure.repositories.candidate_profile_repository import CandidateProfileRepository
+from app.application.resume.candidate_profile_retrieval_service import CandidateProfileRetrievalService
 from app.core.logging import get_logger
 
 logger = get_logger("recommendation_service")
@@ -15,11 +15,11 @@ class RecommendationService:
 
     def __init__(
         self,
-        candidate_repository: CandidateProfileRepository = Depends(CandidateProfileRepository),
+        candidate_retrieval_service: CandidateProfileRetrievalService = Depends(CandidateProfileRetrievalService),
         recommendation_pipeline: RecommendationPipeline = Depends(RecommendationPipeline),
     ):
-        """Initialize the orchestration service with the pipeline and database repository."""
-        self._candidate_repository = candidate_repository
+        """Initialize the orchestration service with the pipeline and retrieval service."""
+        self._candidate_retrieval_service = candidate_retrieval_service
         self._recommendation_pipeline = recommendation_pipeline
 
     async def generate_recommendations(
@@ -34,32 +34,10 @@ class RecommendationService:
         Returns:
             RecommendationResponse: Ranked list of recommendation items.
         """
-        # 1. Load CandidateProfileModel from database
-        candidate_model = self._candidate_repository.find_by_id(request.candidate_profile_id)
-        if not candidate_model:
-            logger.warning(
-                event="candidate_profile_not_found",
-                candidate_profile_id=request.candidate_profile_id,
-            )
-            raise HTTPException(
-                status_code=404,
-                detail=f"Candidate profile with ID {request.candidate_profile_id} not found."
-            )
-
-        # 2. Map model to CandidateProfile domain model
-        try:
-            candidate_profile = CandidateProfile.model_validate(candidate_model.profile_json)
-            # Make sure ID matches database primary key UUID
-            candidate_profile.id = str(candidate_model.id)
-        except Exception as exc:
-            logger.exception(
-                "Failed to deserialize candidate profile JSON",
-                candidate_profile_id=request.candidate_profile_id,
-            )
-            raise HTTPException(
-                status_code=500,
-                detail="Stored candidate profile json is malformed or incompatible."
-            )
+        # 1. Load and map CandidateProfile from database via CandidateProfileRetrievalService
+        candidate_profile = self._candidate_retrieval_service.get_candidate_profile(
+            request.candidate_profile_id
+        )
 
         # 3. Execute the recommendation pipeline (loads jobs from DB dynamically)
         results = await self._recommendation_pipeline.run(

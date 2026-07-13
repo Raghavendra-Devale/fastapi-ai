@@ -58,9 +58,11 @@ class ResumeController:
 
         start_time = time.perf_counter()
         try:
+            print(f"[DEBUG_PERSISTENCE] ResumeController: processing request with resume_id={resume_id}, user_id={user_id}", flush=True)
             # 5. Call ResumePipeline
             logger.info(f"ResumeController: calling pipeline.run with resume_id={resume_id}, user_id={user_id}")
             result = await self._resume_pipeline.run(pdf_bytes, resume_id, user_id)
+            print(f"[DEBUG_PERSISTENCE] ResumeController: pipeline finished successfully", flush=True)
 
             # 6. Extract CandidateProfile and map to business schema
             profile = result.candidate_profile
@@ -113,10 +115,15 @@ class ResumeController:
 )
 async def process_resume(
     file: UploadFile = File(..., description="The resume PDF file to process."),
-    resumeId: int | None = Form(None, description="The Spring Boot resume database ID."),
-    userId: int | None = Form(None, description="The Spring Boot user database ID."),
+    resumeId: int | None = Form(None, description="The Spring Boot resume database ID in camelCase."),
+    resume_id: int | None = Form(None, description="The Spring Boot resume database ID in snake_case."),
+    userId: int | None = Form(None, description="The Spring Boot user database ID in camelCase."),
+    user_id: int | None = Form(None, description="The Spring Boot user database ID in snake_case."),
     settings: Settings = Depends(get_settings),
     controller: ResumeController = Depends(),
 ) -> ResumeIntelligenceSchema:
     """Expose the AI capability through the public business endpoint."""
-    return await controller.process_resume(file, settings, resume_id=resumeId, user_id=userId)
+    effective_resume_id = resumeId if resumeId is not None else resume_id
+    effective_user_id = userId if userId is not None else user_id
+    print(f"[DEBUG_PERSISTENCE] Route process_resume called. Incoming parameters - resumeId: {resumeId}, resume_id: {resume_id}, userId: {userId}, user_id: {user_id}. Resolved resume_id={effective_resume_id}, user_id={effective_user_id}", flush=True)
+    return await controller.process_resume(file, settings, resume_id=effective_resume_id, user_id=effective_user_id)

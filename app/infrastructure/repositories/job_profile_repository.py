@@ -89,3 +89,26 @@ class JobProfileRepository:
         return self.db.query(JobProfileModel).filter(
             JobProfileModel.provider == provider
         ).all()
+
+    def find_similar_jobs(
+        self,
+        embedding: list[float],
+        limit: int = 200,
+    ) -> list[JobProfileModel]:
+        """Find top N similar job profiles using pgvector cosine distance.
+
+        Args:
+            embedding (list[float]): The candidate query embedding.
+            limit (int): The maximum number of jobs to return.
+
+        Returns:
+            list[JobProfileModel]: List of similar job profiles.
+        """
+        # cosine_distance is 1 - cosine_similarity. Lower distance means higher similarity.
+        return (
+            self.db.query(JobProfileModel)
+            .filter(JobProfileModel.embedding.isnot(None))
+            .order_by(JobProfileModel.embedding.cosine_distance(embedding))
+            .limit(limit)
+            .all()
+        )

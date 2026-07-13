@@ -39,10 +39,12 @@ class ResumePersistenceService:
         Returns:
             bool: True if saving was successful.
         """
+        print(f"[DEBUG_PERSISTENCE] ResumePersistenceService: save_resume_analysis called with resume_id={resume_id}, user_id={user_id}", flush=True)
         logger.info(f"ResumePersistenceService: save_resume_analysis called with resume_id={resume_id}, user_id={user_id}")
         # If resume_id or user_id is missing, skip database persistence
         # (This avoids breaking unit tests that bypass DB configurations)
         if resume_id is None or user_id is None:
+            print(f"[DEBUG_PERSISTENCE] ResumePersistenceService: SKIP persistence due to missing ID(s). resume_id={resume_id}, user_id={user_id}", flush=True)
             logger.info(
                 event="skipping_resume_analysis_persistence",
                 reason="missing_resume_id_or_user_id",
@@ -55,9 +57,11 @@ class ResumePersistenceService:
         primary_role = candidate_profile.preferred_roles[0] if candidate_profile.preferred_roles else None
 
         # Check if candidate profile already exists for this resume_id
+        print(f"[DEBUG_PERSISTENCE] ResumePersistenceService: checking if candidate profile exists for resume_id={resume_id}", flush=True)
         existing_profile = self._repository.find_by_resume_id(resume_id)
 
         if existing_profile:
+            print(f"[DEBUG_PERSISTENCE] ResumePersistenceService: Found existing profile ID={existing_profile.id}. Triggering update.", flush=True)
             logger.info(
                 event="updating_existing_candidate_profile",
                 resume_id=resume_id,
@@ -73,9 +77,12 @@ class ResumePersistenceService:
             existing_profile.llm_model = settings.llm_model
             existing_profile.prompt_version = "v1"
 
+            print(f"[DEBUG_PERSISTENCE] ResumePersistenceService: calling repository.update()", flush=True)
             logger.info("ResumePersistenceService: calling repository.update")
             self._repository.update(existing_profile)
+            print(f"[DEBUG_PERSISTENCE] ResumePersistenceService: repository.update() call finished", flush=True)
         else:
+            print(f"[DEBUG_PERSISTENCE] ResumePersistenceService: No existing profile. Creating a new one.", flush=True)
             logger.info(
                 event="saving_new_candidate_profile",
                 resume_id=resume_id,
@@ -93,7 +100,9 @@ class ResumePersistenceService:
                 llm_model=settings.llm_model,
                 prompt_version="v1",
             )
+            print(f"[DEBUG_PERSISTENCE] ResumePersistenceService: calling repository.save()", flush=True)
             logger.info("ResumePersistenceService: calling repository.save")
             self._repository.save(new_profile)
+            print(f"[DEBUG_PERSISTENCE] ResumePersistenceService: repository.save() call finished", flush=True)
 
         return True

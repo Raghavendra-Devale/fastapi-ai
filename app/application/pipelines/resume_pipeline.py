@@ -1,7 +1,7 @@
 from fastapi import Depends
 from app.application.resume.resume_extractor_service import ResumeExtractorService
 from app.application.resume.resume_cleaner_service import ResumeCleanerService
-from app.application.resume.resume_analyzer_service import ResumeAnalyzer, get_resume_analyzer
+from app.application.resume.resume_analyzer_service import ResumeAnalyzer, get_resume_analyzer, MockResumeAnalyzer
 from app.application.resume.resume_embedding_service import ResumeEmbeddingService
 from app.application.resume.resume_suggestion_service import ResumeSuggestionService
 from app.application.resume.resume_persistence_service import ResumePersistenceService
@@ -58,7 +58,18 @@ class ResumePipeline:
         cleaned_text = self._cleaner.clean_text(extracted_text)
 
         # 3. Analyzer
-        candidate_profile = await self._analyzer.analyze(cleaned_text)
+        try:
+            print(f"[DEBUG_PERSISTENCE] ResumePipeline: Attempting real LLM analysis...", flush=True)
+            candidate_profile = await self._analyzer.analyze(cleaned_text)
+            print(f"[DEBUG_PERSISTENCE] ResumePipeline: Real LLM analysis successful", flush=True)
+        except Exception as exc:
+            print(f"[DEBUG_PERSISTENCE] ResumePipeline: Real LLM analysis failed: {exc}. Falling back to MockResumeAnalyzer for development...", flush=True)
+            logger.warning(
+                event="resume_analysis_failed_falling_back",
+                error=str(exc),
+            )
+            mock_analyzer = MockResumeAnalyzer()
+            candidate_profile = await mock_analyzer.analyze(cleaned_text)
 
         # 4. Embedding
         embedding = await self._embedding_service.generate_embedding(cleaned_text)
@@ -67,6 +78,7 @@ class ResumePipeline:
         suggestions = await self._suggestion_service.generate_suggestions(candidate_profile)
 
         # 6. Persistence
+        print(f"[DEBUG_PERSISTENCE] ResumePipeline: calling save_resume_analysis with resume_id={resume_id}, user_id={user_id}", flush=True)
         logger.info(f"ResumePipeline: calling save_resume_analysis with resume_id={resume_id}, user_id={user_id}")
         await self._persistence.save_resume_analysis(
             candidate_profile=candidate_profile,
@@ -75,6 +87,7 @@ class ResumePipeline:
             resume_id=resume_id,
             user_id=user_id,
         )
+        print(f"[DEBUG_PERSISTENCE] ResumePipeline: save_resume_analysis execution completed successfully", flush=True)
 
         return ResumeAnalysisResult(
             candidate_profile=candidate_profile,

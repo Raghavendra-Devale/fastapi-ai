@@ -22,11 +22,15 @@ class CandidateProfileRepository:
         Returns:
             CandidateProfileModel: Refreshed database entity model.
         """
+        print(f"[DEBUG_PERSISTENCE] CandidateProfileRepository.save: db.add profile for resume_id={profile.resume_id}, user_id={profile.user_id}", flush=True)
         logger.info("CandidateProfileRepository: db.add and committing profile")
         self.db.add(profile)
+        print(f"[DEBUG_PERSISTENCE] CandidateProfileRepository.save: db.commit() initiating", flush=True)
         self.db.commit()
+        print(f"[DEBUG_PERSISTENCE] CandidateProfileRepository.save: db.commit() success. db.refresh() initiating", flush=True)
         logger.info("CandidateProfileRepository: db.commit completed, refreshing profile")
         self.db.refresh(profile)
+        print(f"[DEBUG_PERSISTENCE] CandidateProfileRepository.save: db.refresh() success", flush=True)
         logger.info("CandidateProfileRepository: db.refresh completed successfully")
         return profile
 
@@ -65,10 +69,13 @@ class CandidateProfileRepository:
         Returns:
             CandidateProfileModel: Refreshed database entity model.
         """
+        print(f"[DEBUG_PERSISTENCE] CandidateProfileRepository.update: db.commit() initiating for resume_id={profile.resume_id}, user_id={profile.user_id}", flush=True)
         logger.info("CandidateProfileRepository: committing updated profile")
         self.db.commit()
+        print(f"[DEBUG_PERSISTENCE] CandidateProfileRepository.update: db.commit() success. db.refresh() initiating", flush=True)
         logger.info("CandidateProfileRepository: update commit completed, refreshing profile")
         self.db.refresh(profile)
+        print(f"[DEBUG_PERSISTENCE] CandidateProfileRepository.update: db.refresh() success", flush=True)
         logger.info("CandidateProfileRepository: update refresh completed successfully")
         return profile
 

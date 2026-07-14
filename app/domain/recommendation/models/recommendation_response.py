@@ -2,16 +2,13 @@ from pydantic import BaseModel, Field
 
 
 class RecommendationItem(BaseModel):
-    """Represents a single ranked job recommendation item returned by the AI Engine."""
+    """Represents a single ranked job recommendation match returned by the AI Engine."""
 
-    title: str = Field(..., description="The job title.")
-    company: str = Field(..., description="The hiring company name.")
-    location: str | None = Field(None, description="The job location.")
-    description: str = Field(..., description="The job description content.")
-    employment_type: str | None = Field(None, description="The employment type (e.g. Full-time, Part-time).")
-    apply_url: str = Field(..., description="The URL to apply for the job.")
-    similarity_score: float = Field(..., description="The calculated cosine similarity score between the resume and job description.")
-    recommendation_reason: str | None = Field(None, description="An optional explanation or reason for recommending this job.")
+    job_id: int = Field(..., description="The unique Spring Boot job ID.")
+    similarity_score: float = Field(..., description="The calculated match score between the resume and job description.")
+    matching_skills: list[str] = Field(default_factory=list, description="Skills present in both candidate and job.")
+    missing_skills: list[str] = Field(default_factory=list, description="Skills required by the job but missing in the candidate.")
+    recommendation_reason: str | None = Field(None, description="An explanation of why this job was recommended.")
 
 
 class RecommendationResponse(BaseModel):

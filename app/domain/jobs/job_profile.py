@@ -5,6 +5,7 @@ class JobProfile(BaseModel):
     """Canonical Job Profile model acting as the AI representation of a job description."""
 
     id: str | None = Field(None, description="The unique identifier of the job.")
+    job_id: int | None = Field(None, description="The Spring Boot database job ID.")
     title: str = Field(..., description="The job title.")
     company: str = Field(..., description="The hiring company name.")
     summary: str | None = Field(None, description="A brief summary of the job description.")

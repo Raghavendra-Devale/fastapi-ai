@@ -49,13 +49,10 @@ class RecommendationService:
         for res in results:
             recommendations.append(
                 RecommendationItem(
-                    title=res.job_profile.title,
-                    company=res.job_profile.company,
-                    location=res.job_profile.location,
-                    description=res.job_profile.summary or "",
-                    employment_type=res.job_profile.employment_type,
-                    apply_url=res.job_profile.apply_url or "",
-                    similarity_score=res.final_score,  # Expose final score as similarity_score for contract compatibility
+                    job_id=res.job_profile.job_id or 0,
+                    similarity_score=res.final_score,
+                    matching_skills=res.matched_skills,
+                    missing_skills=res.missing_skills,
                     recommendation_reason=res.recommendation_reason,
                 )
             )

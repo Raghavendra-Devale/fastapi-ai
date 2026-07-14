@@ -15,14 +15,11 @@ def mock_recommendation_service():
     mock_service.generate_recommendations.return_value = RecommendationResponse(
         recommendations=[
             RecommendationItem(
-                title="Software Engineer",
-                company="Acme Corp",
-                location="Remote",
-                description="Coding in Python",
-                employment_type="Full-time",
-                apply_url="https://acme.corp/apply",
+                job_id=123,
                 similarity_score=0.95,
-                recommendation_reason=None,
+                matching_skills=["Python", "FastAPI"],
+                missing_skills=["Docker"],
+                recommendation_reason="Excellent match with Python/FastAPI experience.",
             )
         ]
     )
@@ -43,7 +40,7 @@ def test_generate_recommendations_success(mock_recommendation_service):
         assert response.status_code == 200
         data = response.json()
         assert len(data["recommendations"]) == 1
-        assert data["recommendations"][0]["title"] == "Software Engineer"
+        assert data["recommendations"][0]["job_id"] == 123
         assert data["recommendations"][0]["similarity_score"] == 0.95
 
     app.dependency_overrides.clear()

@@ -68,6 +68,7 @@ class JobProfileRetrievalService:
         profile = JobProfile.model_validate(model.profile_json)
         # Overwrite values from database columns to be consistent
         profile.id = str(model.id)
+        profile.job_id = model.job_id
         profile.title = model.title
         profile.company = model.company
         profile.location = model.location

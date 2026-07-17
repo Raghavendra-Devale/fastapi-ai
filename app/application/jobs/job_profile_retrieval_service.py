@@ -4,17 +4,22 @@ from app.domain.jobs.job_profile import JobProfile
 from app.core.models import JobProfileModel
 
 
+from app.application.pipelines.job_pipeline import JobPipeline
+
+
 class JobProfileRetrievalService:
     """Service responsible for retrieving stored JobProfiles from database."""
 
     def __init__(
         self,
         repository: JobProfileRepository = Depends(JobProfileRepository),
+        job_pipeline: JobPipeline = Depends(JobPipeline),
     ):
         """Initialize the retrieval service with dependencies."""
         self._repository = repository
+        self._job_pipeline = job_pipeline
 
-    def find_by_job_id(self, job_id: int) -> JobProfile | None:
+    async def find_by_job_id(self, job_id: int) -> JobProfile | None:
         """Retrieve JobProfile domain model by Spring Boot job ID.
 
         Args:
@@ -24,7 +29,37 @@ class JobProfileRetrievalService:
             JobProfile | None: Domain job profile or None.
         """
         model = self._repository.find_by_job_id(job_id)
-        return self._map_to_domain(model) if model else None
+        if model:
+            return self._map_to_domain(model)
+
+        # Self-healing fallback: try to find raw job and process it dynamically
+        from app.core.models import RawJobModel
+        from app.domain.jobs.models.raw_job import RawJob
+        
+        db = self._repository.db
+        raw_job_db = db.query(RawJobModel).filter(RawJobModel.id == job_id).first()
+        if raw_job_db:
+            try:
+                raw_job = RawJob(
+                    title=raw_job_db.title,
+                    company=raw_job_db.company,
+                    location=raw_job_db.location,
+                    description=raw_job_db.description,
+                    apply_url=raw_job_db.apply_url,
+                    salary=raw_job_db.salary,
+                    employment_type=raw_job_db.job_type,
+                    source=raw_job_db.source
+                )
+                await self._job_pipeline.run(raw_job, job_id=job_id)
+                model = self._repository.find_by_job_id(job_id)
+                if model:
+                    return self._map_to_domain(model)
+            except Exception as e:
+                import logging
+                logging.getLogger("job_profile_retrieval_service").exception(
+                    f"Failed to dynamically process raw job {job_id}"
+                )
+        return None
 
     def find_all(self) -> list[JobProfile]:
         """Retrieve all JobProfiles from the database.

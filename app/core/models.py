@@ -141,3 +141,18 @@ class ProcessingStatusModel(Base):
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True))
     error_message = Column(Text)
+
+
+class RawJobModel(Base):
+    """Represents raw jobs table populated by Spring Boot."""
+    __tablename__ = "jobs"
+
+    id = Column(BigInteger, primary_key=True)
+    title = Column(String(255))
+    company = Column(String(255))
+    location = Column(String(255))
+    description = Column(Text)
+    apply_url = Column(String(255))
+    salary = Column(String(255))
+    job_type = Column(String(255))
+    source = Column(String(255))

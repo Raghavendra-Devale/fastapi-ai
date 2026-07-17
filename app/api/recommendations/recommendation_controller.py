@@ -91,7 +91,7 @@ async def get_job_match_details(
         )
 
     # 2. Fetch Job Profile by Spring Boot job_id
-    job_profile = job_retrieval.find_by_job_id(job_id)
+    job_profile = await job_retrieval.find_by_job_id(job_id)
     if not job_profile:
         raise HTTPException(
             status_code=404,

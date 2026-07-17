@@ -5,7 +5,11 @@ from app.application.pipelines.resume_pipeline import ResumePipeline
 from app.core.config import Settings, get_settings
 from app.core.exceptions import ValidationException
 from app.core.logging import get_logger
-from app.domain.resume.schemas import ResumeIntelligence as ResumeIntelligenceSchema
+from app.domain.resume.schemas import (
+    ResumeIntelligence as ResumeIntelligenceSchema,
+    ResumeProcessAPIResponse,
+    ResumeDetails,
+)
 
 router = APIRouter()
 logger = get_logger("resume_endpoint")
@@ -28,7 +32,7 @@ class ResumeController:
         settings: Settings,
         resume_id: int | None = None,
         user_id: int | None = None,
-    ) -> ResumeIntelligenceSchema:
+    ) -> ResumeProcessAPIResponse:
         """Validate, parse, and process the uploaded PDF file to extract ResumeIntelligence."""
         # 1. Accept PDF only by extension
         if not file.filename or not file.filename.lower().endswith(".pdf"):
@@ -66,8 +70,12 @@ class ResumeController:
 
             # 6. Extract CandidateProfile and map to business schema
             profile = result.candidate_profile
-            return ResumeIntelligenceSchema(
+            duration_ms = (time.perf_counter() - start_time) * 1000.0
+            
+            resume_details = ResumeDetails(
                 extracted_text=result.extracted_text,
+                embedding_model=result.embedding_model,
+                embedding_dimensions=result.embedding_dimensions,
                 summary=profile.summary,
                 skills=profile.skills,
                 education=profile.education,
@@ -75,6 +83,12 @@ class ResumeController:
                 certifications=profile.certifications,
                 projects=profile.projects,
                 languages=profile.languages,
+            )
+
+            return ResumeProcessAPIResponse(
+                success=True,
+                processing_time_ms=duration_ms,
+                resume=resume_details
             )
         finally:
             duration_ms = (time.perf_counter() - start_time) * 1000.0
@@ -89,7 +103,7 @@ class ResumeController:
 
 @router.post(
     "/process",
-    response_model=ResumeIntelligenceSchema,
+    response_model=ResumeProcessAPIResponse,
     status_code=200,
     summary="Process a resume PDF document to extract candidate intelligence",
     description=(
@@ -100,7 +114,7 @@ class ResumeController:
     responses={
         200: {
             "description": "Resume intelligence metadata extracted and returned successfully.",
-            "model": ResumeIntelligenceSchema,
+            "model": ResumeProcessAPIResponse,
         },
         400: {
             "description": "Validation error (invalid file, empty file, or non-PDF content type).",
@@ -121,7 +135,7 @@ async def process_resume(
     user_id: int | None = Form(None, description="The Spring Boot user database ID in snake_case."),
     settings: Settings = Depends(get_settings),
     controller: ResumeController = Depends(),
-) -> ResumeIntelligenceSchema:
+) -> ResumeProcessAPIResponse:
     """Expose the AI capability through the public business endpoint."""
     effective_resume_id = resumeId if resumeId is not None else resume_id
     effective_user_id = userId if userId is not None else user_id
